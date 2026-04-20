@@ -6,13 +6,10 @@ import {
   Play,
   Square,
   Clock,
-  Layers,
   Thermometer,
   Flame,
   Wind,
-  Printer as PrinterIcon,
   FileText,
-  Gauge,
 } from 'lucide-react';
 import {
   LineChart,
@@ -160,17 +157,17 @@ export function PrinterDetailClient({ printerId, name }: Props) {
   const progress = state?.progressPct ?? 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-3">
+      {/* Header compacto */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <div className="text-xs text-muted-foreground uppercase tracking-wider">Impressora</div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Impressora</div>
+          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-3">
             {name}
             <StatusBadge status={state?.status ?? 'UNKNOWN'} />
           </h1>
           {state?.stage ? (
-            <div className="text-sm text-muted-foreground mt-1">{state.stage}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{state.stage}</div>
           ) : null}
         </div>
         <div className="flex gap-2">
@@ -186,51 +183,51 @@ export function PrinterDetailClient({ printerId, name }: Props) {
         </div>
       </div>
 
-      {/* HMS alerts (only renders when there are errors) */}
+      {/* HMS alerts (só renderiza se houver) */}
       <HmsErrorsCard errors={state?.hmsErrors ?? []} />
 
-      {/* Painel da impressora — foto da A1 à esquerda, AMS à direita */}
+      {/* Painel da impressora — A1 compacta + AMS, tudo numa linha curta */}
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-        <div className="grid md:grid-cols-[minmax(200px,260px)_1fr] items-stretch">
-          <div className="relative bg-gradient-to-br from-muted/30 to-background md:border-r border-border/60">
+        <div className="grid md:grid-cols-[minmax(130px,160px)_1fr] items-stretch">
+          <div className="relative bg-gradient-to-br from-muted/30 to-background md:border-r border-border/60 flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/bambu-a1.png"
               alt="Bambu Lab A1"
               draggable={false}
-              className="h-full w-full object-contain p-4 max-h-72"
+              className="max-h-36 max-w-full object-contain p-2"
             />
-            <div className="absolute top-2 left-3 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-              Bambu Lab A1 + AMS Lite
+            <div className="absolute top-1.5 left-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+              A1 + AMS
             </div>
           </div>
-          <div className="p-3">
+          <div className="p-2.5">
             <AmsDisplay slots={state?.amsSlots ?? []} bare />
           </div>
         </div>
       </div>
 
-      {/* Top: camera + current print */}
-      <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-2">
+      {/* Grade principal: câmera + impressão atual + sensores na mesma linha */}
+      <div className="grid gap-3 lg:grid-cols-12">
+        <Card className="lg:col-span-4">
           <CardHeader className="pb-2 flex-row items-center justify-between">
-            <CardTitle className="text-base">Câmera</CardTitle>
-            <div className="flex items-center gap-3">
+            <CardTitle className="text-sm">Câmera</CardTitle>
+            <div className="flex items-center gap-2">
               <SpeedModeIndicator mode={state?.speedMode ?? null} percent={state?.speedPercent} />
               <WifiIndicator dbm={state?.wifiSignalDbm ?? null} />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-3">
             <CameraStream printerId={printerId} />
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Impressão atual</CardTitle>
+            <CardTitle className="text-sm">Impressão atual</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-[9rem_1fr] gap-3 items-start">
+          <CardContent className="space-y-3 pb-3">
+            <div className="grid grid-cols-[7.5rem_1fr] gap-3 items-start">
               <LayerView
                 printerId={printerId}
                 cacheKey={state?.currentFile ?? null}
@@ -239,20 +236,20 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 filamentColor={activeSlot?.color ?? null}
               />
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <FileText className="h-3 w-3" />
                   <span>arquivo</span>
                 </div>
-                <div className="text-sm font-medium truncate">
+                <div className="text-xs font-medium truncate">
                   {state?.currentFile ?? '—'}
                 </div>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-1.5 mt-1.5">
                   <FilamentSwatch
                     color={activeSlot?.color ?? null}
                     active={!!activeSlot}
-                    size="md"
+                    size="sm"
                   />
-                  <div className="text-xs text-muted-foreground min-w-0">
+                  <div className="text-[11px] text-muted-foreground min-w-0 truncate">
                     {activeSlot
                       ? `${activeSlot.filamentType ?? 'Filamento'}${
                           activeSlot.slot !== undefined ? ` — slot ${activeSlot.slot + 1}` : ''
@@ -260,28 +257,27 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                       : 'sem filamento ativo'}
                   </div>
                 </div>
+                <div className="mt-2">
+                  <div className="flex items-baseline justify-between mb-0.5">
+                    <span className="text-2xl font-semibold tabular-nums leading-none">
+                      {progress.toFixed(1)}
+                      <span className="text-sm text-muted-foreground ml-0.5">%</span>
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      c. {state?.currentLayer ?? '—'}/{state?.totalLayers ?? '—'}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div>
-              <div className="flex items-baseline justify-between mb-1">
-                <span className="text-3xl font-semibold tabular-nums">
-                  {progress.toFixed(1)}
-                  <span className="text-base text-muted-foreground ml-0.5">%</span>
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  camada {state?.currentLayer ?? '—'}/{state?.totalLayers ?? '—'}
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 pt-1 border-t border-border/40">
               <StatRow
                 icon={Clock}
                 label="Termina às"
@@ -293,49 +289,53 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 value={formatDuration(state?.remainingSec)}
                 tone="muted"
               />
-              <StatRow
-                icon={Layers}
-                label="Camada"
-                value={`${state?.currentLayer ?? '—'}/${state?.totalLayers ?? '—'}`}
-              />
-              <StatRow
-                icon={Gauge}
-                label="Velocidade"
-                value={state?.speedPercent != null ? `${Math.round(state.speedPercent)}%` : '—'}
-                tone="muted"
-              />
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Sensors */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        {/* Sensores compactos ao lado, stacked vertical */}
+        <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Temperaturas</CardTitle>
+            <CardTitle className="text-sm">Sensores</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <StatRow
-              icon={Thermometer}
-              label="Bico"
-              value={formatTempWithTarget(state?.nozzleTemp, state?.nozzleTargetTemp)}
-              tone="warn"
-            />
-            <StatRow
-              icon={Flame}
-              label="Mesa"
-              value={formatTempWithTarget(state?.bedTemp, state?.bedTargetTemp)}
-              tone="warn"
-            />
-            <StatRow
-              icon={Wind}
-              label="Câmara"
-              value={formatTempOnly(state?.chamberTemp)}
-              tone="muted"
-            />
+          <CardContent className="space-y-3 pb-3">
+            <div className="space-y-1">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                Temperaturas
+              </div>
+              <StatRow
+                icon={Thermometer}
+                label="Bico"
+                value={formatTempWithTarget(state?.nozzleTemp, state?.nozzleTargetTemp)}
+                tone="warn"
+              />
+              <StatRow
+                icon={Flame}
+                label="Mesa"
+                value={formatTempWithTarget(state?.bedTemp, state?.bedTargetTemp)}
+                tone="warn"
+              />
+              <StatRow
+                icon={Wind}
+                label="Câmara"
+                value={formatTempOnly(state?.chamberTemp)}
+                tone="muted"
+              />
+            </div>
+
+            <div className="space-y-1 pt-2 border-t border-border/40">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                Ventoinhas
+              </div>
+              <FansDisplay
+                part={state?.fanPartCoolingPct ?? null}
+                aux={state?.fanAuxPct ?? null}
+                chamber={state?.fanChamberPct ?? null}
+              />
+            </div>
+
             {state?.nozzleDiameter || state?.nozzleType ? (
-              <div className="text-[11px] text-muted-foreground pt-2 border-t border-border/60">
+              <div className="text-[10px] text-muted-foreground pt-2 border-t border-border/40">
                 Bico{' '}
                 {state?.nozzleDiameter ? `${state.nozzleDiameter}mm` : ''}{' '}
                 {state?.nozzleType ? state.nozzleType.replace(/_/g, ' ') : ''}
@@ -343,58 +343,15 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             ) : null}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Ventoinhas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FansDisplay
-              part={state?.fanPartCoolingPct ?? null}
-              aux={state?.fanAuxPct ?? null}
-              chamber={state?.fanChamberPct ?? null}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Impressora</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <StatRow
-              icon={PrinterIcon}
-              label="Modelo"
-              value="Bambu Lab A1"
-              tone="muted"
-            />
-            <StatRow
-              icon={Gauge}
-              label="Modo"
-              value={
-                <SpeedModeIndicator
-                  mode={state?.speedMode ?? null}
-                  percent={state?.speedPercent}
-                />
-              }
-              tone="muted"
-            />
-            <StatRow
-              icon={Wind}
-              label="Rede"
-              value={<WifiIndicator dbm={state?.wifiSignalDbm ?? null} />}
-              tone="muted"
-            />
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Chart */}
-      <Card>
+      {/* Chart + Eventos lado a lado */}
+      <div className="grid gap-3 lg:grid-cols-3">
+      <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Temperaturas — últimas 24h</CardTitle>
+          <CardTitle className="text-sm">Temperaturas — últimas 24h</CardTitle>
         </CardHeader>
-        <CardContent className="h-56">
+        <CardContent className="h-40 pb-3">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -439,23 +396,23 @@ export function PrinterDetailClient({ printerId, name }: Props) {
         </CardContent>
       </Card>
 
-      {/* Events */}
-      <Card>
+      {/* Events — coluna ao lado do chart */}
+      <Card className="lg:col-span-1">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Eventos recentes</CardTitle>
+          <CardTitle className="text-sm">Eventos recentes</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pb-3">
           {events.length === 0 ? (
             <div className="text-xs text-muted-foreground">Sem eventos.</div>
           ) : (
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-1.5 text-xs max-h-36 overflow-y-auto">
               {events.map((ev, i) => (
                 <li
                   key={ev.id ?? `${ev.createdAt}-${i}`}
                   className="flex gap-2 justify-between"
                 >
                   <span className="truncate">{ev.message}</span>
-                  <span className="text-xs text-muted-foreground shrink-0">
+                  <span className="text-[10px] text-muted-foreground shrink-0">
                     {formatDateTime(ev.createdAt)}
                   </span>
                 </li>
@@ -464,6 +421,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
