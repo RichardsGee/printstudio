@@ -5,6 +5,9 @@ import type { CameraManager } from './manager.js';
 
 export interface BedCheckResult {
   hasPlate: boolean;
+  /** True se a mesa parece idêntica ao baseline "chapa limpa" — isto é,
+   *  sem objetos/restos em cima. null quando não há baseline calibrado. */
+  plateClean: boolean | null;
   confidence: 'high' | 'medium' | 'low';
   /** Similaridade com baseline "com chapa" (0..1). Só disponível se houver baseline. */
   similarityWithPlate: number | null;
@@ -18,6 +21,12 @@ export interface BedCheckResult {
   previewBase64: string;
   capturedAt: number;
 }
+
+// Limiar de "limpeza": similaridade com o baseline "com chapa" acima disto
+// indica que a mesa está no mesmo estado do baseline (chapa limpa, sem
+// objetos). Abaixo, ALGO mudou — pode ser objeto esquecido, filamento
+// restante ou apenas iluminação diferente (por isso é heurístico).
+const CLEAN_THRESHOLD = 0.88;
 
 // ROI da mesa na câmera da A1 — recorte em fração da largura × altura.
 // A câmera fica em cima inclinada pra frente, então a mesa ocupa
@@ -90,6 +99,7 @@ export async function analyzeBedFrame(
   const edgeDensity = computeEdgeDensity(data, w, h);
 
   let hasPlate = edgeDensity >= DENSITY_THRESHOLD;
+  let plateClean: boolean | null = null;
   let mode: BedCheckResult['mode'] = 'heuristic';
   let simPlate: number | null = null;
   let simNo: number | null = null;
@@ -101,9 +111,11 @@ export async function analyzeBedFrame(
       simNo = computeSimilarity(base.data, baselines.noPlate);
       hasPlate = simPlate > simNo;
     } else {
-      // Só tem baseline "com chapa" — assume chapa se similaridade > 0.85
       hasPlate = simPlate > 0.85;
     }
+    // Mesa limpa quando o frame atual bate bem com o baseline "com chapa"
+    // (que foi capturado quando a mesa estava pronta pra imprimir).
+    plateClean = hasPlate && simPlate > CLEAN_THRESHOLD;
     mode = 'baseline';
   }
 
@@ -122,6 +134,7 @@ export async function analyzeBedFrame(
 
   return {
     hasPlate,
+    plateClean,
     confidence,
     similarityWithPlate: simPlate,
     similarityNoPlate: simNo,

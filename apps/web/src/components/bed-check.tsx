@@ -12,6 +12,7 @@ const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
 
 interface BedCheckResult {
   hasPlate: boolean;
+  plateClean: boolean | null;
   confidence: 'high' | 'medium' | 'low';
   similarityWithPlate: number | null;
   similarityNoPlate: number | null;
@@ -137,45 +138,43 @@ export function BedCheckCard({ printerId }: { printerId: string }) {
               className="w-full max-w-xs rounded-md border border-border/60"
             />
 
-            <div className="space-y-2">
-              <div
-                className={cn(
-                  'flex items-center gap-2 rounded-md border px-3 py-2',
-                  result.hasPlate
-                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
-                    : 'border-red-500/60 bg-red-500/10 text-red-200',
-                )}
-              >
-                {result.hasPlate ? (
-                  <CheckCircle2 className="h-5 w-5" />
-                ) : (
-                  <AlertTriangle className="h-5 w-5" />
-                )}
-                <div>
-                  <div className="text-sm font-medium">
-                    {result.hasPlate ? 'Chapa detectada' : 'Chapa não detectada'}
-                  </div>
-                  <div className="text-[11px] opacity-80">
-                    Modo: {result.mode === 'baseline' ? 'comparação' : 'heurística'} • Confiança:{' '}
-                    {CONF_LABEL[result.confidence]}
-                  </div>
-                </div>
-              </div>
+            <div className="space-y-2 min-w-[220px]">
+              {/* Chapa presente? */}
+              <Indicator
+                ok={result.hasPlate}
+                okLabel="Chapa detectada"
+                failLabel="Chapa não detectada"
+                confidence={CONF_LABEL[result.confidence]}
+              />
 
-              <div className="text-[11px] text-muted-foreground font-mono space-y-0.5">
+              {/* Mesa limpa? Só aparece se tiver baseline calibrado */}
+              {result.plateClean !== null ? (
+                <Indicator
+                  ok={result.plateClean}
+                  okLabel="Mesa limpa"
+                  failLabel="Algo detectado na mesa"
+                  confidence={
+                    result.similarityWithPlate
+                      ? `${(result.similarityWithPlate * 100).toFixed(0)}% similar ao baseline`
+                      : undefined
+                  }
+                />
+              ) : null}
+
+              {/* Veredito final pra ação */}
+              {result.plateClean !== null ? (
+                <VerdictBanner hasPlate={result.hasPlate} plateClean={result.plateClean} />
+              ) : null}
+
+              <div className="text-[10px] text-muted-foreground font-mono space-y-0.5 pt-1 border-t border-border/40">
+                <div>Modo: {result.mode === 'baseline' ? 'comparação' : 'heurística'}</div>
                 {result.similarityWithPlate !== null ? (
-                  <div>
-                    Sim. c/ chapa: {(result.similarityWithPlate * 100).toFixed(1)}%
-                  </div>
+                  <div>Sim. limpa: {(result.similarityWithPlate * 100).toFixed(1)}%</div>
                 ) : null}
                 {result.similarityNoPlate !== null ? (
-                  <div>
-                    Sim. s/ chapa: {(result.similarityNoPlate * 100).toFixed(1)}%
-                  </div>
+                  <div>Sim. s/ chapa: {(result.similarityNoPlate * 100).toFixed(1)}%</div>
                 ) : null}
-                <div>
-                  Edge density: {(result.edgeDensity * 100).toFixed(2)}%
-                </div>
+                <div>Edge density: {(result.edgeDensity * 100).toFixed(2)}%</div>
                 <div>{new Date(result.capturedAt).toLocaleTimeString('pt-BR')}</div>
               </div>
             </div>
@@ -183,5 +182,53 @@ export function BedCheckCard({ printerId }: { printerId: string }) {
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function Indicator({
+  ok,
+  okLabel,
+  failLabel,
+  confidence,
+}: {
+  ok: boolean;
+  okLabel: string;
+  failLabel: string;
+  confidence?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-md border px-2.5 py-1.5',
+        ok
+          ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
+          : 'border-red-500/60 bg-red-500/10 text-red-200',
+      )}
+    >
+      {ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+      <div className="min-w-0">
+        <div className="text-xs font-medium">{ok ? okLabel : failLabel}</div>
+        {confidence ? <div className="text-[10px] opacity-75 truncate">{confidence}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function VerdictBanner({ hasPlate, plateClean }: { hasPlate: boolean; plateClean: boolean }) {
+  const ready = hasPlate && plateClean;
+  const message = !hasPlate
+    ? '⚠ Coloque a chapa antes de imprimir'
+    : !plateClean
+      ? '⚠ Remova o que está na mesa'
+      : '✓ Pronto pra imprimir';
+  return (
+    <div
+      className={cn(
+        'text-xs font-medium rounded px-2.5 py-1.5 text-center',
+        ready ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200',
+      )}
+    >
+      {message}
+    </div>
   );
 }
