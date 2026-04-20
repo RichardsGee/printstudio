@@ -10,7 +10,6 @@ import {
   Flame,
   Wind,
   FileText,
-  DoorOpen,
   HardDrive,
 } from 'lucide-react';
 import {
@@ -172,12 +171,6 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             {state?.stage ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider rounded-md border border-border/60 bg-muted/40 text-muted-foreground px-1.5 py-0.5">
                 {state.stage}
-              </span>
-            ) : null}
-            {state?.doorOpen ? (
-              <span className="inline-flex items-center gap-1 text-xs font-mono rounded-md border border-amber-500/60 bg-amber-500/15 text-amber-200 px-1.5 py-0.5">
-                <DoorOpen className="h-3 w-3" />
-                PORTA ABERTA
               </span>
             ) : null}
             {state?.isFromSdCard ? (

@@ -89,20 +89,31 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
   });
 
   // Current print-job thumbnail extracted from the printer's `.3mf` via FTPS.
-  // Served as PNG with aggressive cache-busting since the underlying job changes.
-  app.get<{ Params: { id: string } }>('/api/printers/:id/thumbnail.png', async (req, reply) => {
-    const thumb = thumbnails.get(req.params.id);
-    if (!thumb) {
-      return reply.code(404).send({ error: 'no thumbnail yet' });
-    }
-    reply
-      .type('image/png')
-      .header('Cache-Control', 'no-store')
-      .header('Access-Control-Allow-Origin', '*')
-      .header('X-Thumbnail-File', encodeURIComponent(thumb.fileName))
-      .send(thumb.image);
-    return reply;
-  });
+  // Quando o cliente passa `?file=`, só devolve se o cache bater com o
+  // arquivo solicitado — evita mostrar thumbnail antigo entre a mudança
+  // do currentFile e o fetch do novo .3mf (que leva alguns segundos).
+  app.get<{ Params: { id: string }; Querystring: { file?: string } }>(
+    '/api/printers/:id/thumbnail.png',
+    async (req, reply) => {
+      const thumb = thumbnails.get(req.params.id);
+      if (!thumb) {
+        return reply.code(404).send({ error: 'no thumbnail yet' });
+      }
+      const requested = req.query.file;
+      if (requested && requested !== thumb.fileName) {
+        // Cliente pediu o thumbnail do arquivo X mas só temos do Y —
+        // provavelmente o bridge ainda não baixou o novo .3mf.
+        return reply.code(404).send({ error: 'thumbnail for different file' });
+      }
+      reply
+        .type('image/png')
+        .header('Cache-Control', 'no-store')
+        .header('Access-Control-Allow-Origin', '*')
+        .header('X-Thumbnail-File', encodeURIComponent(thumb.fileName))
+        .send(thumb.image);
+      return reply;
+    },
+  );
 
   // MJPEG stream: multipart/x-mixed-replace so a plain <img> tag plays it.
   // Low-tech but works in every browser, zero JS required.
