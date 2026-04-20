@@ -15,6 +15,7 @@ import type { CameraManager } from '../camera/manager.js';
 import type { ThumbnailManager } from '../ftp/thumbnail-manager.js';
 import type { LayersManager } from '../gcode/layers-manager.js';
 import type { Logger } from '../logger.js';
+import { analyzeBedFrame, captureFreshFrame } from '../camera/bed-check.js';
 
 interface ServerOpts {
   manager: MqttManager;
@@ -60,6 +61,26 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
       return { commandId: result.commandId, ok: true };
     },
   );
+
+  // Bed-check: analisa um frame da câmera e retorna se há chapa
+  // magnética detectada na mesa. Usa Sobel + edge density (sem ML).
+  app.get<{ Params: { id: string } }>('/api/printers/:id/bed-check', async (req, reply) => {
+    const frame = await captureFreshFrame(cameras, req.params.id);
+    if (!frame) {
+      return reply.code(503).send({ error: 'camera unavailable' });
+    }
+    try {
+      const result = await analyzeBedFrame(frame);
+      reply.header('Access-Control-Allow-Origin', '*').send(result);
+      return reply;
+    } catch (err) {
+      logger.error(
+        { err: err instanceof Error ? err.message : err, printerId: req.params.id },
+        'bed-check analysis failed',
+      );
+      return reply.code(500).send({ error: 'analysis failed' });
+    }
+  });
 
   // Parsed gcode layers (compact JSON). Frontend renders as SVG animation.
   // Gzipa manualmente quando o cliente aceita — o payload de ~2MB vira

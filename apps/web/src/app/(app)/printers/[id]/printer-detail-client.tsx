@@ -31,6 +31,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { AmsDisplay } from '@/components/ams-display';
 import { HmsErrorsCard } from '@/components/hms-errors-card';
 import { CameraStream } from '@/components/camera-stream';
+import { BedCheckCard } from '@/components/bed-check';
 import { FilamentSwatch } from '@/components/filament-swatch';
 import { SpeedModeIndicator } from '@/components/speed-mode-indicator';
 import { WifiIndicator } from '@/components/wifi-indicator';
@@ -349,6 +350,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bed check — verificação da chapa antes de iniciar prints */}
+      <BedCheckCard printerId={printerId} />
 
       {/* Chart + Eventos lado a lado */}
       <div className="grid gap-3 lg:grid-cols-3">
