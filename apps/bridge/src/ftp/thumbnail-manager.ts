@@ -8,39 +8,67 @@ interface CachedThumb {
   fetchedAt: number;
 }
 
+const RETRY_MIN_MS = 5_000;
+const RETRY_MAX_MS = 300_000;
+
 /**
- * Keeps the latest plate-render thumbnail per printer cached in memory.
- * Refetches whenever the active `currentFile` changes.
- *
- * Lazy and throttled — only actually hits the printer when (a) a new file
- * is reported and (b) we don't already have a cached thumb for that file.
+ * Cache em memória da última thumbnail de cada printer. Refaz o fetch
+ * quando `currentFile` muda, e reagenda com backoff exponencial quando
+ * a impressora ainda não subiu o .3mf pro FTP (costuma levar alguns
+ * segundos após o início da impressão).
  */
 export class ThumbnailManager {
   private readonly cache = new Map<string, CachedThumb>();
   private readonly inFlight = new Set<string>();
-  private readonly lastFile = new Map<string, string>();
+  private readonly targetFile = new Map<string, string>();
+  private readonly retryTimer = new Map<string, NodeJS.Timeout>();
+  private readonly retryDelay = new Map<string, number>();
 
   constructor(
     private readonly printers: PrinterConfig[],
     private readonly logger: Logger,
   ) {}
 
-  /** Call whenever a state update is received for a printer. */
   onState(state: PrinterState): void {
     const fileName = state.currentFile;
     if (!fileName) {
-      this.lastFile.delete(state.printerId);
+      this.targetFile.delete(state.printerId);
+      this.cancelRetry(state.printerId);
       return;
     }
-    const prior = this.lastFile.get(state.printerId);
-    if (prior === fileName) return; // nothing new to fetch
-    this.lastFile.set(state.printerId, fileName);
+    const prior = this.targetFile.get(state.printerId);
+    if (prior === fileName) return;
+    this.targetFile.set(state.printerId, fileName);
+    this.retryDelay.delete(state.printerId);
+    this.cancelRetry(state.printerId);
 
     const cached = this.cache.get(state.printerId);
-    if (cached && cached.fileName === fileName) return; // already cached
+    if (cached && cached.fileName === fileName) return;
 
-    if (this.inFlight.has(state.printerId)) return; // dedupe parallel fetches
+    if (this.inFlight.has(state.printerId)) return;
     void this.fetch(state.printerId, fileName);
+  }
+
+  private cancelRetry(printerId: string): void {
+    const t = this.retryTimer.get(printerId);
+    if (t) {
+      clearTimeout(t);
+      this.retryTimer.delete(printerId);
+    }
+  }
+
+  private scheduleRetry(printerId: string, fileName: string): void {
+    const prev = this.retryDelay.get(printerId) ?? RETRY_MIN_MS;
+    const next = Math.min(prev * 2, RETRY_MAX_MS);
+    this.retryDelay.set(printerId, next);
+    this.cancelRetry(printerId);
+    const t = setTimeout(() => {
+      this.retryTimer.delete(printerId);
+      if (this.targetFile.get(printerId) !== fileName) return;
+      if (this.inFlight.has(printerId)) return;
+      void this.fetch(printerId, fileName);
+    }, prev);
+    this.retryTimer.set(printerId, t);
   }
 
   private async fetch(printerId: string, fileName: string): Promise<void> {
@@ -54,14 +82,17 @@ export class ThumbnailManager {
       const image = await fetcher.fetchLatestThumbnail(fileName);
       if (image) {
         this.cache.set(printerId, { fileName, image, fetchedAt: Date.now() });
+        this.retryDelay.delete(printerId);
       } else {
-        this.logger.warn({ printerId, fileName }, 'thumbnail: fetch returned null');
+        this.logger.warn({ printerId, fileName }, 'thumbnail: not available, will retry');
+        this.scheduleRetry(printerId, fileName);
       }
     } catch (err) {
       this.logger.warn(
         { printerId, err: err instanceof Error ? err.message : String(err) },
-        'thumbnail: unexpected error',
+        'thumbnail: error, will retry',
       );
+      this.scheduleRetry(printerId, fileName);
     } finally {
       this.inFlight.delete(printerId);
     }
