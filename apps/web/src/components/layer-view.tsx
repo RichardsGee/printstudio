@@ -40,17 +40,12 @@ interface Props {
   className?: string;
 }
 
-const COS_A = Math.cos((30 * Math.PI) / 180);
-const SIN_A = Math.sin((30 * Math.PI) / 180);
-
-function project(x: number, y: number, z: number, zScale: number): [number, number] {
-  return [(x - y) * COS_A, (x + y) * SIN_A - z * zScale];
-}
-
-function adaptiveZScale(xRange: number, yRange: number, zMax: number): number {
-  if (zMax <= 0.01) return 1;
-  const xyExtent = Math.max(xRange, yRange);
-  return Math.max(1, Math.min((xyExtent * 0.45) / zMax, 30));
+// Projeção top-down 2D: world (x, y) → screen (sx, sy). Flip Y pra
+// alinhar com SVG (origem no topo-esquerda). Muito mais leve que
+// isométrico — todas as camadas compartilham o mesmo plano XY e só
+// a ordem de desenho define o "empilhamento" visual.
+function project(x: number, y: number): [number, number] {
+  return [x, -y];
 }
 
 function normalizeHex(c: string | null | undefined): string {
@@ -347,11 +342,6 @@ function LayerSvg({
   const groupsRef = useRef<SVGGElement[]>([]);
 
   const { layerSvgs, bounds } = useMemo(() => {
-    const xRange = data.bounds.maxX - data.bounds.minX;
-    const yRange = data.bounds.maxY - data.bounds.minY;
-    const zMax = data.layers.length > 0 ? data.layers[data.layers.length - 1].z : 0;
-    const zS = adaptiveZScale(xRange, yRange, zMax);
-
     let minSX = Number.POSITIVE_INFINITY;
     let maxSX = Number.NEGATIVE_INFINITY;
     let minSY = Number.POSITIVE_INFINITY;
@@ -359,21 +349,20 @@ function LayerSvg({
 
     // Por camada, concatena TODAS as polilinhas do mesmo tool num único
     // atributo `d` (ex: "M1,2 L3,4 M5,6 L7,8") — gera 1 elemento <path>
-    // por combinação (layer × tool) em vez de um por polilinha. Isso
-    // reduz a contagem de nós no DOM em 1-2 ordens de grandeza.
+    // por combinação (layer × tool) em vez de um por polilinha.
     const layerSvgs = data.layers.map((layer) => {
       const byTool = new Map<number, string>();
       for (const poly of layer.paths) {
         const pts = poly.points;
         if (!pts || pts.length === 0) continue;
-        const [fx, fy] = project(pts[0][0], pts[0][1], layer.z, zS);
+        const [fx, fy] = project(pts[0][0], pts[0][1]);
         if (fx < minSX) minSX = fx;
         if (fx > maxSX) maxSX = fx;
         if (fy < minSY) minSY = fy;
         if (fy > maxSY) maxSY = fy;
         let segment = `M${fx.toFixed(1)},${fy.toFixed(1)}`;
         for (let i = 1; i < pts.length; i++) {
-          const [sx, sy] = project(pts[i][0], pts[i][1], layer.z, zS);
+          const [sx, sy] = project(pts[i][0], pts[i][1]);
           if (sx < minSX) minSX = sx;
           if (sx > maxSX) maxSX = sx;
           if (sy < minSY) minSY = sy;
