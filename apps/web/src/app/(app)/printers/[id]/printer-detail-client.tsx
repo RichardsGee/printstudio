@@ -166,9 +166,14 @@ export function PrinterDetailClient({ printerId, name }: Props) {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Impressora</div>
-          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-3">
+          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2 flex-wrap">
             {name}
             <StatusBadge status={state?.status ?? 'UNKNOWN'} />
+            {state?.stage ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider rounded-md border border-border/60 bg-muted/40 text-muted-foreground px-1.5 py-0.5">
+                {state.stage}
+              </span>
+            ) : null}
             {state?.doorOpen ? (
               <span className="inline-flex items-center gap-1 text-xs font-mono rounded-md border border-amber-500/60 bg-amber-500/15 text-amber-200 px-1.5 py-0.5">
                 <DoorOpen className="h-3 w-3" />
@@ -182,10 +187,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               </span>
             ) : null}
           </h1>
-          {state?.stage ? (
+          {state?.stateChangeReason ? (
             <div className="text-xs text-muted-foreground mt-0.5">
-              {state.stage}
-              {state?.stateChangeReason ? ` — ${state.stateChangeReason}` : ''}
+              {state.stateChangeReason}
             </div>
           ) : null}
         </div>
@@ -220,24 +224,13 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               A1 + AMS
             </div>
           </div>
-          <div className="p-2.5 space-y-2">
+          <div className="p-2.5">
             <AmsDisplay
               slots={state?.amsSlots ?? []}
               units={state?.amsUnits ?? []}
               model="A1"
               bare
             />
-            {/* PTFE entre AMS e extrusor — filamento em trânsito */}
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground shrink-0">
-                AMS → bico
-              </span>
-              <PtfeTube
-                color={activeSlot?.color ?? null}
-                active={state?.status === 'PRINTING'}
-                className="flex-1"
-              />
-            </div>
           </div>
         </div>
       </div>

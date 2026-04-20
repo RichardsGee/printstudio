@@ -36,25 +36,27 @@ export function PtfeTube({ color, active, className }: Props) {
 
       {active ? (
         <>
-          {/* Filamento correndo dentro — animação mais tranquila (4s) */}
+          {/* Filamento correndo dentro — anima na velocidade do filamento
+              real (~mm/s na extrusão), não da cabeça (mm/s de viagem).
+              9s por ciclo dá sensação de fluxo constante sem parecer
+              acelerado. */}
           <div
             className="absolute top-1/2 -translate-y-1/2 h-[4px] rounded-full"
             style={{
               width: '38%',
               backgroundColor: tint,
               boxShadow: `0 0 4px ${tint}aa`,
-              animation: 'ptfe-slide 4s linear infinite',
+              animation: 'ptfe-slide 9s linear infinite',
             }}
           />
-          {/* Segmento com delay pra continuidade sem gap */}
           <div
             className="absolute top-1/2 -translate-y-1/2 h-[4px] rounded-full"
             style={{
               width: '38%',
               backgroundColor: tint,
               boxShadow: `0 0 4px ${tint}aa`,
-              animation: 'ptfe-slide 4s linear infinite',
-              animationDelay: '-2s',
+              animation: 'ptfe-slide 9s linear infinite',
+              animationDelay: '-4.5s',
             }}
           />
         </>
