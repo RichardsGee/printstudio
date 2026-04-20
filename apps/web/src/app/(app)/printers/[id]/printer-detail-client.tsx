@@ -224,13 +224,24 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               A1 + AMS
             </div>
           </div>
-          <div className="p-2.5">
+          <div className="p-2.5 space-y-2">
             <AmsDisplay
               slots={state?.amsSlots ?? []}
               units={state?.amsUnits ?? []}
               model="A1"
               bare
             />
+            {/* Fluxo AMS → bico, visível quando imprimindo */}
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground shrink-0">
+                AMS → bico
+              </span>
+              <PtfeTube
+                color={activeSlot?.color ?? null}
+                active={state?.status === 'PRINTING'}
+                className="flex-1"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -290,12 +301,6 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 ) : null}
               </div>
             </div>
-
-            {/* Tubo PTFE com filamento animado — visual só quando imprimindo */}
-            <PtfeTube
-              color={activeSlot?.color ?? null}
-              active={state?.status === 'PRINTING'}
-            />
 
             {/* Progresso geral + camadas — mesmo estilo, valores grandes */}
             <div className="space-y-2.5">
