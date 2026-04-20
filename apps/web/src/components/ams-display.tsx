@@ -103,7 +103,7 @@ function SlotCell({ slot, index }: { slot: AmsSlot | null; index: number }) {
     <div
       className={cn(
         'flex items-center gap-2 rounded-lg border px-2 py-1.5',
-        active ? 'border-primary/60 bg-primary/5' : 'border-border/40',
+        active ? 'border-primary/50 bg-primary/[0.03]' : 'border-border/40',
       )}
     >
       <Spool

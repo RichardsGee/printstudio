@@ -150,11 +150,10 @@ export function Spool({
       {active ? (
         <div
           aria-hidden
-          className="absolute rounded-full pointer-events-none animate-pulse"
+          className="absolute rounded-full pointer-events-none"
           style={{
-            inset: '2%',
-            boxShadow: '0 0 22px 2px rgba(59,130,246,0.55)',
-            border: '2px solid rgba(59,130,246,0.85)',
+            inset: '3%',
+            boxShadow: '0 0 0 1px rgba(59,130,246,0.65), 0 0 6px 0 rgba(59,130,246,0.25)',
           }}
         />
       ) : null}

@@ -40,6 +40,7 @@ import { WifiIndicator } from '@/components/wifi-indicator';
 import { FansDisplay } from '@/components/fans-display';
 import { StatRow } from '@/components/stat-row';
 import { PrintPreview } from '@/components/print-preview';
+import { PtfeTube } from '@/components/ptfe-tube';
 import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -284,6 +285,12 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 ) : null}
               </div>
             </div>
+
+            {/* Tubo PTFE com filamento animado — visual só quando imprimindo */}
+            <PtfeTube
+              color={activeSlot?.color ?? null}
+              active={state?.status === 'PRINTING'}
+            />
 
             {/* Progresso geral + camadas — mesmo estilo, valores grandes */}
             <div className="space-y-2.5">
