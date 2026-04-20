@@ -38,9 +38,36 @@ function adaptiveZScale(xRange: number, yRange: number, zMax: number): number {
 }
 
 function normalizeHex(c: string | null | undefined): string {
-  if (!c) return '#3b82f6'; // azul default quando não tem filamento info
+  if (!c) return '#3b82f6';
   const m = c.match(/^#?([0-9a-fA-F]{6,8})$/);
   return m ? `#${m[1].slice(0, 6)}` : '#3b82f6';
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const m = hex.replace('#', '');
+  return [
+    parseInt(m.slice(0, 2), 16),
+    parseInt(m.slice(2, 4), 16),
+    parseInt(m.slice(4, 6), 16),
+  ];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const h = (n: number): string => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/**
+ * Garante que a cor tenha luminância mínima pra ficar visível sobre
+ * fundo escuro. Se for muito escura (filamento preto/marrom/verde
+ * escuro), mistura com branco até alcançar o piso.
+ */
+function ensureContrast(hex: string, minLum = 0.55): string {
+  const [r, g, b] = hexToRgb(hex);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  if (lum >= minLum) return hex;
+  const mix = (minLum - lum) / (1 - lum);
+  return rgbToHex(r + (255 - r) * mix, g + (255 - g) * mix, b + (255 - b) * mix);
 }
 
 /**
@@ -107,7 +134,7 @@ export function LayerView({
     return () => window.removeEventListener('keydown', onKey);
   }, [expanded]);
 
-  const hex = normalizeHex(filamentColor);
+  const hex = ensureContrast(normalizeHex(filamentColor));
   const currentZ =
     data && currentLayer && currentLayer > 0
       ? data.layers[Math.min(currentLayer - 1, data.layers.length - 1)]?.z
@@ -290,37 +317,54 @@ function LayerSvg({
       className="absolute inset-0 h-full w-full"
     >
       <defs>
+        {/* Vignette radial leve pra dar profundidade ao fundo */}
+        <radialGradient id={`bg-${idSuffix}`} cx="50%" cy="50%" r="70%">
+          <stop offset="0%" stopColor="hsl(220 35% 10%)" />
+          <stop offset="100%" stopColor="hsl(220 50% 4%)" />
+        </radialGradient>
         <style>{`
           .layer-done-${idSuffix} path {
             stroke: ${color};
             stroke-width: 0.3;
             fill: none;
             stroke-linejoin: round;
-            stroke-opacity: 0.92;
+            stroke-linecap: round;
+            stroke-opacity: 0.95;
           }
           .layer-active-${idSuffix} path {
             stroke: #ffffff;
-            stroke-width: 0.55;
+            stroke-width: 0.6;
             fill: none;
             stroke-linejoin: round;
-            filter: drop-shadow(0 0 1.5px ${color});
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 2px ${color}) drop-shadow(0 0 0.5px #fff);
           }
           .layer-future-${idSuffix} path {
-            stroke: ${color};
+            stroke: hsl(220 25% 55%);
             stroke-width: 0.18;
             fill: none;
             stroke-linejoin: round;
-            stroke-opacity: 0.1;
+            stroke-opacity: 0.18;
           }
           .layer-preview-${idSuffix} path {
             stroke: ${color};
-            stroke-width: 0.22;
+            stroke-width: 0.24;
             fill: none;
             stroke-linejoin: round;
-            stroke-opacity: 0.5;
+            stroke-linecap: round;
+            stroke-opacity: 0.55;
           }
         `}</style>
       </defs>
+
+      {/* Fundo com gradiente radial sutil pra dar depth */}
+      <rect
+        x={bounds.minX - pad}
+        y={bounds.minY - pad}
+        width={width + pad * 2}
+        height={height + pad * 2}
+        fill={`url(#bg-${idSuffix})`}
+      />
       {paths.map((layerPaths, i) => (
         <g
           key={i}
