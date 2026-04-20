@@ -36,25 +36,25 @@ export function PtfeTube({ color, active, className }: Props) {
 
       {active ? (
         <>
-          {/* Filamento principal correndo dentro */}
+          {/* Filamento correndo dentro — animação mais tranquila (4s) */}
           <div
             className="absolute top-1/2 -translate-y-1/2 h-[4px] rounded-full"
             style={{
               width: '38%',
               backgroundColor: tint,
               boxShadow: `0 0 4px ${tint}aa`,
-              animation: 'ptfe-slide 1.8s linear infinite',
+              animation: 'ptfe-slide 4s linear infinite',
             }}
           />
-          {/* Segmento "fantasma" pra continuidade (evita gap visível) */}
+          {/* Segmento com delay pra continuidade sem gap */}
           <div
             className="absolute top-1/2 -translate-y-1/2 h-[4px] rounded-full"
             style={{
               width: '38%',
               backgroundColor: tint,
               boxShadow: `0 0 4px ${tint}aa`,
-              animation: 'ptfe-slide 1.8s linear infinite',
-              animationDelay: '-0.9s',
+              animation: 'ptfe-slide 4s linear infinite',
+              animationDelay: '-2s',
             }}
           />
         </>

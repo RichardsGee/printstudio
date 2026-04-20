@@ -41,6 +41,7 @@ import { FansDisplay } from '@/components/fans-display';
 import { StatRow } from '@/components/stat-row';
 import { PrintPreview } from '@/components/print-preview';
 import { PtfeTube } from '@/components/ptfe-tube';
+import { PowerUsage } from '@/components/power-usage';
 import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -219,13 +220,24 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               A1 + AMS
             </div>
           </div>
-          <div className="p-2.5">
+          <div className="p-2.5 space-y-2">
             <AmsDisplay
               slots={state?.amsSlots ?? []}
               units={state?.amsUnits ?? []}
               model="A1"
               bare
             />
+            {/* PTFE entre AMS e extrusor — filamento em trânsito */}
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground shrink-0">
+                AMS → bico
+              </span>
+              <PtfeTube
+                color={activeSlot?.color ?? null}
+                active={state?.status === 'PRINTING'}
+                className="flex-1"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -332,8 +344,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
 
         {/* Sensores compactos ao lado, stacked vertical */}
         <Card className="lg:col-span-3">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 flex-row items-center justify-between">
             <CardTitle className="text-sm">Sensores</CardTitle>
+            <PowerUsage state={state} />
           </CardHeader>
           <CardContent className="space-y-3 pb-3">
             <div className="space-y-1">
