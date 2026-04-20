@@ -41,6 +41,7 @@ import { StatRow } from '@/components/stat-row';
 import { PrintPreview } from '@/components/print-preview';
 import { PtfeTube } from '@/components/ptfe-tube';
 import { PowerUsage } from '@/components/power-usage';
+import { FilamentUsage } from '@/components/filament-usage';
 import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -168,9 +169,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2 flex-wrap">
             {name}
             <StatusBadge status={state?.status ?? 'UNKNOWN'} />
-            {state?.stage ? (
+            {shouldShowStage(state?.status, state?.stage) ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider rounded-md border border-border/60 bg-muted/40 text-muted-foreground px-1.5 py-0.5">
-                {state.stage}
+                {state!.stage}
               </span>
             ) : null}
             {state?.isFromSdCard ? (
@@ -319,8 +320,8 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               />
             </div>
 
-            {/* Footer: ETA + restante + velocidade, alinhado em grid regular */}
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/40 text-xs">
+            {/* Footer: ETA + restante + velocidade + filamento, grid 4 cols */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-border/40 text-xs">
               <InfoPill label="Termina às" value={formatEtaClock(state?.remainingSec)} />
               <InfoPill label="Restante" value={formatDuration(state?.remainingSec)} />
               <InfoPill
@@ -328,6 +329,11 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 value={
                   state?.speedPercent != null ? `${Math.round(state.speedPercent)}%` : '—'
                 }
+              />
+              <FilamentUsage
+                printerId={printerId}
+                cacheKey={state?.currentFile ?? null}
+                progressPct={progress}
               />
             </div>
           </CardContent>
@@ -469,6 +475,38 @@ export function PrinterDetailClient({ printerId, name }: Props) {
       </div>
     </div>
   );
+}
+
+/**
+ * Quando o status já é claro (IMPRIMINDO/CONCLUÍDO/etc.), esconder
+ * stages "triviais" que ficam stuck ou são redundantes com o status.
+ * Só mostra stage durante PRINTING quando é algo genuinamente
+ * diferente do "toca fita normal" (pausas, troca de filamento,
+ * operações finais etc.).
+ */
+const NOTABLE_STAGES_WHILE_PRINTING = new Set([
+  'Trocando filamento',
+  'Pausa M400',
+  'Pausa por acabou filamento',
+  'Pausado',
+  'Pausado pelo usuário',
+  'Pausa por tampa aberta',
+  'Pausa por temperatura do bico',
+  'Pausa por temperatura da mesa',
+  'Pausa por AMS desconectado',
+  'Pausa por ventoinha lenta',
+  'Pausa por temperatura da câmara',
+  'Pausa via G-code',
+  'Cortando filamento',
+  'Guardando arquivo',
+  'Encerrando impressão',
+  'Finalizando',
+]);
+
+function shouldShowStage(status: string | undefined, stage: string | null | undefined): boolean {
+  if (!stage) return false;
+  if (status === 'PRINTING') return NOTABLE_STAGES_WHILE_PRINTING.has(stage);
+  return true;
 }
 
 function InfoPill({ label, value }: { label: string; value: string }) {
