@@ -173,6 +173,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 cacheKey={state?.currentFile ?? null}
                 currentLayer={state?.currentLayer ?? null}
                 totalLayers={state?.totalLayers ?? null}
+                filamentColor={activeSlot?.color ?? null}
               />
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

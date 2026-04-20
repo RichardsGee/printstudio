@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Layers as LayersIcon, Maximize2 } from 'lucide-react';
+import { Box, Layers as LayersIcon, Maximize2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
@@ -19,55 +19,57 @@ interface Props {
   cacheKey?: string | null;
   currentLayer?: number | null;
   totalLayers?: number | null;
+  /** Cor hex do filamento ativo — camadas impressas renderizam nessa cor. */
+  filamentColor?: string | null;
   className?: string;
 }
 
-// Projeção isométrica 30° — world (x, y, z) → screen (sx, sy).
 const COS_A = Math.cos((30 * Math.PI) / 180);
 const SIN_A = Math.sin((30 * Math.PI) / 180);
 
 function project(x: number, y: number, z: number, zScale: number): [number, number] {
-  const sx = (x - y) * COS_A;
-  const sy = (x + y) * SIN_A - z * zScale;
-  return [sx, sy];
+  return [(x - y) * COS_A, (x + y) * SIN_A - z * zScale];
 }
 
-/**
- * Z_SCALE adaptativo: pra modelos baixos (ex. chaveiro 2mm) a altura
- * empilhada seria invisível se usássemos escala 1:1 com o XY. Queremos
- * que a altura projetada represente ~40-50% da maior dimensão XY.
- */
 function adaptiveZScale(xRange: number, yRange: number, zMax: number): number {
   if (zMax <= 0.01) return 1;
   const xyExtent = Math.max(xRange, yRange);
-  const targetHeight = xyExtent * 0.45;
-  const scale = targetHeight / zMax;
-  return Math.max(1, Math.min(scale, 30));
+  return Math.max(1, Math.min((xyExtent * 0.45) / zMax, 30));
+}
+
+function normalizeHex(c: string | null | undefined): string {
+  if (!c) return '#3b82f6'; // azul default quando não tem filamento info
+  const m = c.match(/^#?([0-9a-fA-F]{6,8})$/);
+  return m ? `#${m[1].slice(0, 6)}` : '#3b82f6';
 }
 
 /**
- * Preview isométrico das camadas do gcode. Mostra sempre o modelo
- * inteiro: camadas já impressas aparecem sólidas em azul, a camada
- * atual é o destaque em verde neon, e camadas futuras ficam como
- * fantasma cinza muito esmaecido — pra o usuário ver a forma final
- * e acompanhar o progresso da impressão ao mesmo tempo.
- *
- * Atualizações em tempo real mudam apenas a `class` de cada `<g>` no
- * DOM — sem re-render React.
+ * Preview isométrico das camadas do gcode. As camadas já impressas
+ * usam a cor real do filamento ativo; a camada em impressão pulsa em
+ * branco quente (contraste forte sobre qualquer cor de filamento);
+ * camadas futuras ficam como fantasma bem esmaecido. Click abre
+ * modal em tela cheia pra análise detalhada.
  */
-export function LayerView({ printerId, cacheKey, currentLayer, totalLayers, className }: Props) {
+export function LayerView({
+  printerId,
+  cacheKey,
+  currentLayer,
+  totalLayers,
+  filamentColor,
+  className,
+}: Props) {
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
   const [data, setData] = useState<LayersData | null>(null);
-  const layerGroupsRef = useRef<SVGGElement[]>([]);
-  const retryRef = useRef<NodeJS.Timeout | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let alive = true;
     let attempt = 0;
+    let timer: NodeJS.Timeout | null = null;
     setStatus('loading');
     setData(null);
 
-    const fetchOnce = (): void => {
+    const run = (): void => {
       const url = `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/layers.json?v=${encodeURIComponent(
         cacheKey ?? 'none',
       )}`;
@@ -75,9 +77,7 @@ export function LayerView({ printerId, cacheKey, currentLayer, totalLayers, clas
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
         .then((payload: LayersData) => {
           if (!alive) return;
-          if (!payload.layers || payload.layers.length === 0) {
-            throw new Error('empty layers');
-          }
+          if (!payload.layers || payload.layers.length === 0) throw new Error('empty');
           setData(payload);
           setStatus('ok');
         })
@@ -86,25 +86,145 @@ export function LayerView({ printerId, cacheKey, currentLayer, totalLayers, clas
           attempt++;
           const delay = Math.min(3000 * Math.pow(2, attempt - 1), 30000);
           if (attempt === 1) setStatus('empty');
-          retryRef.current = setTimeout(fetchOnce, delay);
+          timer = setTimeout(run, delay);
         });
     };
+    run();
 
-    fetchOnce();
     return () => {
       alive = false;
-      if (retryRef.current) clearTimeout(retryRef.current);
+      if (timer) clearTimeout(timer);
     };
   }, [printerId, cacheKey]);
 
-  const { paths, bounds, zScale } = useMemo(() => {
-    if (!data) {
-      return {
-        paths: [] as string[][],
-        bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0 },
-        zScale: 1,
-      };
-    }
+  // Escape fecha o modal
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expanded]);
+
+  const hex = normalizeHex(filamentColor);
+  const currentZ =
+    data && currentLayer && currentLayer > 0
+      ? data.layers[Math.min(currentLayer - 1, data.layers.length - 1)]?.z
+      : null;
+
+  return (
+    <>
+      <div
+        className={cn(
+          'group relative aspect-square w-full rounded-md border border-border/60 bg-[#060910] cursor-zoom-in',
+          'transition-all duration-300 ease-out',
+          'hover:scale-[1.15] hover:shadow-2xl hover:shadow-primary/40 hover:border-primary/60 hover:z-20',
+          className,
+        )}
+        onClick={() => status === 'ok' && setExpanded(true)}
+      >
+        <div className="absolute inset-0 overflow-hidden rounded-md">
+          {status === 'ok' && data ? (
+            <>
+              <LayerSvg
+                data={data}
+                currentLayer={currentLayer ?? null}
+                color={hex}
+                idSuffix="card"
+              />
+              <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between text-[10px] font-mono text-muted-foreground pointer-events-none">
+                <span className="flex items-center gap-1 bg-background/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+                  <LayersIcon className="h-3 w-3" />
+                  {currentLayer ?? 0}/{totalLayers ?? data.totalLayers}
+                </span>
+                {currentZ !== null ? (
+                  <span className="bg-background/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+                    Z {currentZ.toFixed(2)}mm
+                  </span>
+                ) : null}
+              </div>
+              <div className="absolute top-1.5 right-1.5 opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <Maximize2 className="h-3.5 w-3.5 text-primary" />
+              </div>
+            </>
+          ) : (
+            <div className="absolute inset-0 grid place-items-center text-muted-foreground">
+              <div className="flex flex-col items-center gap-1 text-xs">
+                <Box className="h-6 w-6" strokeWidth={1.5} />
+                <span>
+                  {status === 'loading'
+                    ? 'Analisando fatias…'
+                    : 'Aguardando fatia do próximo trabalho…'}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {expanded && data ? (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm grid place-items-center p-6 cursor-zoom-out"
+          onClick={() => setExpanded(false)}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 rounded-full bg-background/70 p-2 hover:bg-background transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(false);
+            }}
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div
+            className="relative w-full max-w-4xl aspect-square rounded-lg border border-border/40 bg-[#060910] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <LayerSvg
+              data={data}
+              currentLayer={currentLayer ?? null}
+              color={hex}
+              idSuffix="modal"
+            />
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-sm font-mono text-muted-foreground pointer-events-none">
+              <span className="flex items-center gap-2 bg-background/70 backdrop-blur px-3 py-1.5 rounded">
+                <LayersIcon className="h-4 w-4" />
+                Camada {currentLayer ?? 0}/{totalLayers ?? data.totalLayers}
+              </span>
+              {currentZ !== null ? (
+                <span className="bg-background/70 backdrop-blur px-3 py-1.5 rounded">
+                  Z {currentZ.toFixed(2)}mm
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * SVG puro renderizando todas as camadas projetadas. Extraído como
+ * sub-componente pra reutilizar no card e no modal.
+ */
+function LayerSvg({
+  data,
+  currentLayer,
+  color,
+  idSuffix,
+}: {
+  data: LayersData;
+  currentLayer: number | null;
+  color: string;
+  idSuffix: string;
+}) {
+  const groupsRef = useRef<SVGGElement[]>([]);
+
+  const { paths, bounds } = useMemo(() => {
     const xRange = data.bounds.maxX - data.bounds.minX;
     const yRange = data.bounds.maxY - data.bounds.minY;
     const zMax = data.layers.length > 0 ? data.layers[data.layers.length - 1].z : 0;
@@ -135,144 +255,85 @@ export function LayerView({ printerId, cacheKey, currentLayer, totalLayers, clas
         return d;
       }),
     );
-
     if (!Number.isFinite(minSX)) {
       minSX = 0;
       maxSX = 0;
       minSY = 0;
       maxSY = 0;
     }
-    return {
-      paths: projected,
-      bounds: { minX: minSX, maxX: maxSX, minY: minSY, maxY: maxSY },
-      zScale: zS,
-    };
+    return { paths: projected, bounds: { minX: minSX, maxX: maxSX, minY: minSY, maxY: maxSY } };
   }, [data]);
 
-  // Aplica status via classe no DOM conforme a camada atual avança.
-  // `done` / `active` / `future` — todas são renderizadas e visíveis,
-  // apenas com estilos diferentes (nunca escondemos mais).
   useEffect(() => {
-    const groups = layerGroupsRef.current;
+    const groups = groupsRef.current;
     if (!groups.length) return;
     const active = currentLayer && currentLayer > 0;
     const idx = active ? Math.min(currentLayer - 1, groups.length - 1) : -1;
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
       if (!g) continue;
-      if (!active) g.setAttribute('class', 'layer-preview');
-      else if (i < idx) g.setAttribute('class', 'layer-done');
-      else if (i === idx) g.setAttribute('class', 'layer-active');
-      else g.setAttribute('class', 'layer-future');
+      if (!active) g.setAttribute('class', `layer-preview-${idSuffix}`);
+      else if (i < idx) g.setAttribute('class', `layer-done-${idSuffix}`);
+      else if (i === idx) g.setAttribute('class', `layer-active-${idSuffix}`);
+      else g.setAttribute('class', `layer-future-${idSuffix}`);
     }
-  }, [currentLayer, data]);
+  }, [currentLayer, data, idSuffix]);
 
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
   const pad = Math.max(width, height) * 0.06;
-  const currentZ =
-    data && currentLayer && currentLayer > 0
-      ? data.layers[Math.min(currentLayer - 1, data.layers.length - 1)]?.z
-      : null;
 
   return (
-    <div
-      className={cn(
-        'group relative aspect-square w-full rounded-md border border-border/60 bg-[#060910]',
-        'transition-all duration-300 ease-out',
-        'hover:scale-[1.12] hover:shadow-2xl hover:shadow-primary/30 hover:border-primary/50 hover:z-10',
-        className,
-      )}
+    <svg
+      viewBox={`${bounds.minX - pad} ${bounds.minY - pad} ${width + pad * 2} ${height + pad * 2}`}
+      preserveAspectRatio="xMidYMid meet"
+      className="absolute inset-0 h-full w-full"
     >
-      <div className="absolute inset-0 overflow-hidden rounded-md">
-        {status === 'ok' && data ? (
-          <>
-            <svg
-              viewBox={`${bounds.minX - pad} ${bounds.minY - pad} ${width + pad * 2} ${height + pad * 2}`}
-              preserveAspectRatio="xMidYMid meet"
-              className="absolute inset-0 h-full w-full"
-            >
-              <defs>
-                <style>{`
-                  /* Camadas já impressas — sólidas em azul elétrico */
-                  .layer-done path {
-                    stroke: hsl(210 95% 62%);
-                    stroke-width: 0.3;
-                    fill: none;
-                    stroke-linejoin: round;
-                  }
-                  /* Camada atual — destaque em verde neon com glow */
-                  .layer-active path {
-                    stroke: hsl(142 90% 60%);
-                    stroke-width: 0.55;
-                    fill: none;
-                    stroke-linejoin: round;
-                    filter: drop-shadow(0 0 1.2px hsl(142 90% 60%));
-                  }
-                  /* Camadas futuras — fantasma bem esmaecido pra manter a silhueta */
-                  .layer-future path {
-                    stroke: hsl(217 30% 50% / 0.15);
-                    stroke-width: 0.18;
-                    fill: none;
-                    stroke-linejoin: round;
-                  }
-                  /* Preview quando sem impressão — todas com média intensidade */
-                  .layer-preview path {
-                    stroke: hsl(217 75% 58% / 0.45);
-                    stroke-width: 0.22;
-                    fill: none;
-                    stroke-linejoin: round;
-                  }
-                `}</style>
-              </defs>
-              {paths.map((layerPaths, i) => (
-                <g
-                  key={i}
-                  ref={(el) => {
-                    if (el) layerGroupsRef.current[i] = el;
-                  }}
-                  className="layer-future"
-                >
-                  {layerPaths.map((d, j) => (
-                    <path key={j} d={d} />
-                  ))}
-                </g>
-              ))}
-            </svg>
-
-            {/* HUD inferior: camada atual + Z */}
-            <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between text-[10px] font-mono text-muted-foreground pointer-events-none">
-              <span className="flex items-center gap-1 bg-background/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
-                <LayersIcon className="h-3 w-3" />
-                {currentLayer ?? 0}/{totalLayers ?? data.totalLayers}
-              </span>
-              {currentZ !== null ? (
-                <span className="bg-background/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
-                  Z {currentZ.toFixed(2)}mm
-                </span>
-              ) : null}
-            </div>
-
-            {/* Hint de zoom aparece no hover */}
-            <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              <Maximize2 className="h-3.5 w-3.5 text-primary" />
-            </div>
-          </>
-        ) : null}
-
-        {status !== 'ok' ? (
-          <div className="absolute inset-0 grid place-items-center text-muted-foreground">
-            <div className="flex flex-col items-center gap-1 text-xs">
-              <Box className="h-6 w-6" strokeWidth={1.5} />
-              <span>
-                {status === 'loading'
-                  ? 'Analisando fatias…'
-                  : 'Aguardando fatia do próximo trabalho…'}
-              </span>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
+      <defs>
+        <style>{`
+          .layer-done-${idSuffix} path {
+            stroke: ${color};
+            stroke-width: 0.3;
+            fill: none;
+            stroke-linejoin: round;
+            stroke-opacity: 0.92;
+          }
+          .layer-active-${idSuffix} path {
+            stroke: #ffffff;
+            stroke-width: 0.55;
+            fill: none;
+            stroke-linejoin: round;
+            filter: drop-shadow(0 0 1.5px ${color});
+          }
+          .layer-future-${idSuffix} path {
+            stroke: ${color};
+            stroke-width: 0.18;
+            fill: none;
+            stroke-linejoin: round;
+            stroke-opacity: 0.1;
+          }
+          .layer-preview-${idSuffix} path {
+            stroke: ${color};
+            stroke-width: 0.22;
+            fill: none;
+            stroke-linejoin: round;
+            stroke-opacity: 0.5;
+          }
+        `}</style>
+      </defs>
+      {paths.map((layerPaths, i) => (
+        <g
+          key={i}
+          ref={(el) => {
+            if (el) groupsRef.current[i] = el;
+          }}
+          className={`layer-future-${idSuffix}`}
+        >
+          {layerPaths.map((d, j) => (
+            <path key={j} d={d} />
+          ))}
+        </g>
+      ))}
+    </svg>
   );
 }

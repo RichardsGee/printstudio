@@ -27,6 +27,23 @@ export interface LayerData {
   paths: number[][][];
 }
 
+export interface GcodeMetadata {
+  /** Tempo estimado total em segundos, incluindo pre-heat e purges. */
+  estimatedSec: number | null;
+  /** Tempo apenas de impressão (sem aquecimento) em segundos. */
+  modelSec: number | null;
+  /** Total de camadas (igual ao comprimento de `layers` quando o parse bate). */
+  totalLayers: number | null;
+  /** Gramas por filamento carregado (índice = filament channel). */
+  filamentWeightG: number[];
+  /** Comprimento em mm por filamento. */
+  filamentLengthMm: number[];
+  /** Cores hex por filamento. Pode ter espaços vazios (;;). */
+  filamentColors: string[];
+  /** Custo em moeda do sistema (por kg geralmente) por filamento. */
+  filamentCost: number[];
+}
+
 export interface LayersData {
   /** Bounding box XY em mm — permite o renderizador centralizar sem recalcular. */
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
@@ -34,6 +51,64 @@ export interface LayersData {
   totalLayers: number;
   /** Array de camadas, ordenadas de baixo para cima. */
   layers: LayerData[];
+  /** Metadados extraídos do cabeçalho do gcode. */
+  metadata: GcodeMetadata;
+}
+
+export function parseGcodeMetadata(text: string): GcodeMetadata {
+  // Só precisamos dos primeiros ~500 linhas — metadados vivem no
+  // cabeçalho e no rodapé. Procurando só nas 500 primeiras.
+  const head = text.slice(0, Math.min(text.length, 80_000));
+
+  const parseDuration = (s: string): number | null => {
+    const m = s.match(/(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/);
+    if (!m) return null;
+    const h = Number(m[1] ?? 0);
+    const min = Number(m[2] ?? 0);
+    const sec = Number(m[3] ?? 0);
+    const total = h * 3600 + min * 60 + sec;
+    return total > 0 ? total : null;
+  };
+
+  const timeMatch = head.match(
+    /;\s*model printing time:\s*([^;\n]+);\s*total estimated time:\s*([^\n]+)/i,
+  );
+  const modelSec = timeMatch ? parseDuration(timeMatch[1].trim()) : null;
+  const estimatedSec = timeMatch ? parseDuration(timeMatch[2].trim()) : null;
+
+  const layerMatch = head.match(/;\s*total layer number:\s*(\d+)/i);
+  const totalLayers = layerMatch ? Number(layerMatch[1]) : null;
+
+  const parseNumList = (pattern: RegExp): number[] => {
+    const m = head.match(pattern);
+    if (!m) return [];
+    return m[1]
+      .split(/[,;]/)
+      .map((v) => Number(v.trim()))
+      .filter((n) => Number.isFinite(n));
+  };
+
+  const filamentWeightG = parseNumList(/;\s*total filament weight\s*\[g\]\s*:\s*([^\n]+)/i);
+  const filamentLengthMm = parseNumList(/;\s*total filament length\s*\[mm\]\s*:\s*([^\n]+)/i);
+  const filamentCost = parseNumList(/;\s*filament_cost\s*=\s*([^\n]+)/i);
+
+  const colorMatch = head.match(/;\s*filament_colour\s*=\s*([^\n]+)/i);
+  const filamentColors = colorMatch
+    ? colorMatch[1]
+        .split(';')
+        .map((c) => c.trim())
+        .filter((c) => /^#[0-9a-fA-F]{6,8}$/.test(c))
+    : [];
+
+  return {
+    estimatedSec,
+    modelSec,
+    totalLayers,
+    filamentWeightG,
+    filamentLengthMm,
+    filamentColors,
+    filamentCost,
+  };
 }
 
 const EMPTY_BOUNDS = {
@@ -174,6 +249,7 @@ export function parseGcodeToLayers(text: string): LayersData {
     bounds,
     totalLayers: layers.length,
     layers,
+    metadata: parseGcodeMetadata(text),
   };
 }
 
