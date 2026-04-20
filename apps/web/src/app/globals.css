@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    /* === Brand + shadcn base === */
     --background: 222 47% 5%;
     --foreground: 210 40% 98%;
     --card: 222 47% 7%;
@@ -24,6 +25,38 @@
     --input: 217 33% 20%;
     --ring: 217 91% 60%;
     --radius: 0.6rem;
+
+    /* === Semantic tones — use no lugar dos hardcoded amber-400/red-400 === */
+    --success: 142 70% 48%;
+    --success-foreground: 145 80% 88%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 89%;
+    --danger: 0 84% 60%;
+    --danger-foreground: 0 86% 94%;
+    --info: 199 89% 48%;
+    --info-foreground: 204 100% 91%;
+
+    /* === Elevation (box-shadows consistentes) === */
+    --elev-0: 0 0 0 0 rgb(0 0 0 / 0);
+    --elev-1: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --elev-2: 0 4px 8px -2px rgb(0 0 0 / 0.35);
+    --elev-3: 0 8px 16px -4px rgb(0 0 0 / 0.4);
+
+    /* === Typography scale — em rem pra honrar zoom do usuário === */
+    /* 10px → micro (uppercase labels monoespaçadas) */
+    --fs-micro: 0.625rem;
+    /* 11px → caption (subvalue, metadata) */
+    --fs-caption: 0.6875rem;
+    /* 12px → small (texto secundário) */
+    --fs-small: 0.75rem;
+    /* 14px → body (padrão) */
+    --fs-body: 0.875rem;
+    /* 16px → body-lg */
+    --fs-body-lg: 1rem;
+    /* 20px → heading */
+    --fs-heading: 1.25rem;
+    /* 30px → display (hero values) */
+    --fs-display: 1.875rem;
   }
 
   html {
@@ -37,5 +70,38 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+/* === Utilitários semânticos — combinam bg + text pra tons de status === */
+@layer utilities {
+  .tone-success {
+    color: hsl(var(--success));
+  }
+  .tone-warning {
+    color: hsl(var(--warning));
+  }
+  .tone-danger {
+    color: hsl(var(--danger));
+  }
+  .tone-info {
+    color: hsl(var(--info));
+  }
+
+  .bg-tone-success {
+    background-color: hsl(var(--success) / 0.12);
+    border-color: hsl(var(--success) / 0.35);
+  }
+  .bg-tone-warning {
+    background-color: hsl(var(--warning) / 0.12);
+    border-color: hsl(var(--warning) / 0.35);
+  }
+  .bg-tone-danger {
+    background-color: hsl(var(--danger) / 0.12);
+    border-color: hsl(var(--danger) / 0.4);
+  }
+  .bg-tone-info {
+    background-color: hsl(var(--info) / 0.12);
+    border-color: hsl(var(--info) / 0.35);
   }
 }

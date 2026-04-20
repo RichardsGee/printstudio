@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { LayoutDashboard, History, Bell, Printer, LogOut } from 'lucide-react';
+import { LayoutDashboard, History, Bell, Printer, LogOut, Palette } from 'lucide-react';
 import { auth, signOut } from '@/lib/auth';
 import { DualModeIndicator } from '@/components/dual-mode-indicator';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/history', label: 'Histórico', icon: History },
   { href: '/events', label: 'Eventos', icon: Bell },
+  { href: '/design-system', label: 'Design', icon: Palette },
 ];
 
 export default async function AppLayout({
