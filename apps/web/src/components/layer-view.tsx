@@ -357,9 +357,12 @@ function LayerSvg({
     let minSY = Number.POSITIVE_INFINITY;
     let maxSY = Number.NEGATIVE_INFINITY;
 
-    // Pra cada camada, agrupa polilinhas por tool (1 path SVG por tool).
+    // Por camada, concatena TODAS as polilinhas do mesmo tool num único
+    // atributo `d` (ex: "M1,2 L3,4 M5,6 L7,8") — gera 1 elemento <path>
+    // por combinação (layer × tool) em vez de um por polilinha. Isso
+    // reduz a contagem de nós no DOM em 1-2 ordens de grandeza.
     const layerSvgs = data.layers.map((layer) => {
-      const byTool = new Map<number, string[]>();
+      const byTool = new Map<number, string>();
       for (const poly of layer.paths) {
         const pts = poly.points;
         if (!pts || pts.length === 0) continue;
@@ -368,20 +371,19 @@ function LayerSvg({
         if (fx > maxSX) maxSX = fx;
         if (fy < minSY) minSY = fy;
         if (fy > maxSY) maxSY = fy;
-        let d = `M${fx.toFixed(2)},${fy.toFixed(2)}`;
+        let segment = `M${fx.toFixed(1)},${fy.toFixed(1)}`;
         for (let i = 1; i < pts.length; i++) {
           const [sx, sy] = project(pts[i][0], pts[i][1], layer.z, zS);
           if (sx < minSX) minSX = sx;
           if (sx > maxSX) maxSX = sx;
           if (sy < minSY) minSY = sy;
           if (sy > maxSY) maxSY = sy;
-          d += ` L${sx.toFixed(2)},${sy.toFixed(2)}`;
+          segment += `L${sx.toFixed(1)},${sy.toFixed(1)}`;
         }
-        const arr = byTool.get(poly.tool);
-        if (arr) arr.push(d);
-        else byTool.set(poly.tool, [d]);
+        const existing = byTool.get(poly.tool);
+        byTool.set(poly.tool, existing ? `${existing} ${segment}` : segment);
       }
-      return Array.from(byTool.entries()).map(([tool, paths]) => ({ tool, paths }));
+      return Array.from(byTool.entries()).map(([tool, d]) => ({ tool, d }));
     });
 
     if (!Number.isFinite(minSX)) {
@@ -458,15 +460,9 @@ function LayerSvg({
           }}
           className={`lyr-future-${idSuffix}`}
         >
-          {toolGroups.map(({ tool, paths }) => {
+          {toolGroups.map(({ tool, d }) => {
             const c = colorFor(tool);
-            return (
-              <g key={tool} style={{ color: c }}>
-                {paths.map((d, j) => (
-                  <path key={j} d={d} stroke={c} />
-                ))}
-              </g>
-            );
+            return <path key={tool} d={d} stroke={c} style={{ color: c }} />;
           })}
         </g>
       ))}

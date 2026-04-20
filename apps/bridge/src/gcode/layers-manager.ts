@@ -96,7 +96,10 @@ export class LayersManager {
       }
       const started = Date.now();
       const raw = parseGcodeToLayers(payload.gcode);
-      const simplified = simplifyLayers(raw, 0.08);
+      // 0.25mm de threshold — pra um display de ~600px num modelo de
+      // ~200mm a resolução efetiva é ~0.3mm/px. Simplificação maior
+      // que isso já é sub-pixel e só pesa o DOM.
+      const simplified = simplifyLayers(raw, 0.25);
       const elapsed = Date.now() - started;
       this.logger.info(
         {

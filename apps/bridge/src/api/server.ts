@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
 import { randomUUID } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import {
   BridgeMessageSchema,
   CommandActionSchema,
@@ -61,21 +62,29 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
   );
 
   // Parsed gcode layers (compact JSON). Frontend renders as SVG animation.
+  // Gzipa manualmente quando o cliente aceita — o payload de ~2MB vira
+  // ~150KB, cortando o "pesado" do preview quase todo.
   app.get<{ Params: { id: string } }>('/api/printers/:id/layers.json', async (req, reply) => {
     const cached = layers.get(req.params.id);
     if (!cached) {
       return reply.code(404).send({ error: 'no gcode parsed yet' });
     }
+    const body = JSON.stringify({
+      fileName: cached.fileName,
+      fetchedAt: cached.fetchedAt,
+      ...cached.data,
+    });
+    const acceptsGzip = /gzip/i.test(String(req.headers['accept-encoding'] ?? ''));
     reply
       .type('application/json')
       .header('Cache-Control', 'no-store')
       .header('Access-Control-Allow-Origin', '*')
-      .header('X-Layers-File', encodeURIComponent(cached.fileName))
-      .send({
-        fileName: cached.fileName,
-        fetchedAt: cached.fetchedAt,
-        ...cached.data,
-      });
+      .header('X-Layers-File', encodeURIComponent(cached.fileName));
+    if (acceptsGzip) {
+      reply.header('Content-Encoding', 'gzip').send(gzipSync(body));
+    } else {
+      reply.send(body);
+    }
     return reply;
   });
 
