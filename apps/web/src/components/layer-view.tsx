@@ -7,11 +7,27 @@ import { cn } from '@/lib/utils';
 const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
 const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
 
+interface LayerPath {
+  tool: number;
+  points: number[][];
+}
+
+interface LayersMetadata {
+  estimatedSec: number | null;
+  modelSec: number | null;
+  totalLayers: number | null;
+  filamentWeightG: number[];
+  filamentLengthMm: number[];
+  filamentColors: string[];
+  filamentCost: number[];
+}
+
 interface LayersData {
   fileName: string;
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
   totalLayers: number;
-  layers: Array<{ z: number; paths: number[][][] }>;
+  layers: Array<{ z: number; paths: LayerPath[] }>;
+  metadata?: LayersMetadata;
 }
 
 interface Props {
@@ -157,7 +173,8 @@ export function LayerView({
               <LayerSvg
                 data={data}
                 currentLayer={currentLayer ?? null}
-                color={hex}
+                toolColors={data.metadata?.filamentColors ?? []}
+                fallbackColor={hex}
                 idSuffix="card"
               />
               <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between text-[10px] font-mono text-muted-foreground pointer-events-none">
@@ -213,9 +230,35 @@ export function LayerView({
             <LayerSvg
               data={data}
               currentLayer={currentLayer ?? null}
-              color={hex}
+              toolColors={data.metadata?.filamentColors ?? []}
+              fallbackColor={hex}
               idSuffix="modal"
             />
+
+            {/* HUD superior — arquivo + tempo + filamentos */}
+            <div className="absolute top-3 left-3 right-14 flex items-start justify-between gap-3 pointer-events-none">
+              <div className="bg-background/75 backdrop-blur px-3 py-2 rounded min-w-0">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                  Arquivo
+                </div>
+                <div className="text-sm font-medium truncate max-w-xs">
+                  {data.fileName}
+                </div>
+              </div>
+              {data.metadata?.estimatedSec ? (
+                <div className="bg-background/75 backdrop-blur px-3 py-2 rounded">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Tempo est.
+                  </div>
+                  <div className="text-sm font-medium tabular-nums">
+                    {formatMinutes(data.metadata.estimatedSec)}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <FilamentLegend metadata={data.metadata} />
+
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-sm font-mono text-muted-foreground pointer-events-none">
               <span className="flex items-center gap-2 bg-background/70 backdrop-blur px-3 py-1.5 rounded">
                 <LayersIcon className="h-4 w-4" />
@@ -234,24 +277,76 @@ export function LayerView({
   );
 }
 
+function formatMinutes(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 /**
- * SVG puro renderizando todas as camadas projetadas. Extraído como
- * sub-componente pra reutilizar no card e no modal.
+ * Legenda de filamentos — mostra uma pílula por cor usada com
+ * gramagem e comprimento, posicionada no canto inferior-esquerdo
+ * do modal.
+ */
+function FilamentLegend({ metadata }: { metadata?: LayersMetadata }) {
+  if (!metadata || metadata.filamentColors.length === 0) return null;
+  const rows = metadata.filamentColors.map((color, i) => ({
+    color,
+    weight: metadata.filamentWeightG[i] ?? null,
+    length: metadata.filamentLengthMm[i] ?? null,
+  }));
+  // Filtra filamentos que realmente têm uso (weight > 0)
+  const used = rows.filter((r) => (r.weight ?? 0) > 0.01);
+  if (used.length === 0) return null;
+
+  return (
+    <div className="absolute top-3 right-14 flex flex-col gap-1.5 items-end pointer-events-none translate-y-[68px]">
+      {used.map((r, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2 bg-background/75 backdrop-blur px-2.5 py-1 rounded text-[11px]"
+        >
+          <span
+            className="h-3 w-3 rounded-full ring-1 ring-white/20 shrink-0"
+            style={{ backgroundColor: r.color }}
+          />
+          <span className="font-mono tabular-nums text-foreground">
+            {r.weight !== null ? `${r.weight.toFixed(2)}g` : '—'}
+          </span>
+          {r.length !== null ? (
+            <span className="font-mono tabular-nums text-muted-foreground">
+              {(r.length / 1000).toFixed(2)}m
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * SVG isométrico das camadas. Cada polilinha é desenhada na cor
+ * do seu tool (filamento) conforme indicado pelo gcode. A camada
+ * ativa destaca-se com glow branco; camadas já impressas aparecem
+ * em tom sólido reduzido; futuras ficam como silhueta fantasma.
  */
 function LayerSvg({
   data,
   currentLayer,
-  color,
+  toolColors,
+  fallbackColor,
   idSuffix,
 }: {
   data: LayersData;
   currentLayer: number | null;
-  color: string;
+  toolColors: string[];
+  fallbackColor: string;
   idSuffix: string;
 }) {
   const groupsRef = useRef<SVGGElement[]>([]);
 
-  const { paths, bounds } = useMemo(() => {
+  const { layerSvgs, bounds } = useMemo(() => {
     const xRange = data.bounds.maxX - data.bounds.minX;
     const yRange = data.bounds.maxY - data.bounds.minY;
     const zMax = data.layers.length > 0 ? data.layers[data.layers.length - 1].z : 0;
@@ -262,33 +357,40 @@ function LayerSvg({
     let minSY = Number.POSITIVE_INFINITY;
     let maxSY = Number.NEGATIVE_INFINITY;
 
-    const projected: string[][] = data.layers.map((layer) =>
-      layer.paths.map((poly) => {
-        if (poly.length === 0) return '';
-        const [fx, fy] = project(poly[0][0], poly[0][1], layer.z, zS);
+    // Pra cada camada, agrupa polilinhas por tool (1 path SVG por tool).
+    const layerSvgs = data.layers.map((layer) => {
+      const byTool = new Map<number, string[]>();
+      for (const poly of layer.paths) {
+        const pts = poly.points;
+        if (!pts || pts.length === 0) continue;
+        const [fx, fy] = project(pts[0][0], pts[0][1], layer.z, zS);
         if (fx < minSX) minSX = fx;
         if (fx > maxSX) maxSX = fx;
         if (fy < minSY) minSY = fy;
         if (fy > maxSY) maxSY = fy;
         let d = `M${fx.toFixed(2)},${fy.toFixed(2)}`;
-        for (let i = 1; i < poly.length; i++) {
-          const [sx, sy] = project(poly[i][0], poly[i][1], layer.z, zS);
+        for (let i = 1; i < pts.length; i++) {
+          const [sx, sy] = project(pts[i][0], pts[i][1], layer.z, zS);
           if (sx < minSX) minSX = sx;
           if (sx > maxSX) maxSX = sx;
           if (sy < minSY) minSY = sy;
           if (sy > maxSY) maxSY = sy;
           d += ` L${sx.toFixed(2)},${sy.toFixed(2)}`;
         }
-        return d;
-      }),
-    );
+        const arr = byTool.get(poly.tool);
+        if (arr) arr.push(d);
+        else byTool.set(poly.tool, [d]);
+      }
+      return Array.from(byTool.entries()).map(([tool, paths]) => ({ tool, paths }));
+    });
+
     if (!Number.isFinite(minSX)) {
       minSX = 0;
       maxSX = 0;
       minSY = 0;
       maxSY = 0;
     }
-    return { paths: projected, bounds: { minX: minSX, maxX: maxSX, minY: minSY, maxY: maxSY } };
+    return { layerSvgs, bounds: { minX: minSX, maxX: maxSX, minY: minSY, maxY: maxSY } };
   }, [data]);
 
   useEffect(() => {
@@ -299,16 +401,23 @@ function LayerSvg({
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
       if (!g) continue;
-      if (!active) g.setAttribute('class', `layer-preview-${idSuffix}`);
-      else if (i < idx) g.setAttribute('class', `layer-done-${idSuffix}`);
-      else if (i === idx) g.setAttribute('class', `layer-active-${idSuffix}`);
-      else g.setAttribute('class', `layer-future-${idSuffix}`);
+      if (!active) g.setAttribute('class', `lyr-preview-${idSuffix}`);
+      else if (i < idx) g.setAttribute('class', `lyr-done-${idSuffix}`);
+      else if (i === idx) g.setAttribute('class', `lyr-active-${idSuffix}`);
+      else g.setAttribute('class', `lyr-future-${idSuffix}`);
     }
   }, [currentLayer, data, idSuffix]);
 
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
   const pad = Math.max(width, height) * 0.06;
+
+  // Resolve cor por tool — usa metadata se tiver, senão fallback.
+  const colorFor = (tool: number): string => {
+    const raw = toolColors[tool];
+    if (raw) return ensureContrast(raw, 0.5);
+    return fallbackColor;
+  };
 
   return (
     <svg
@@ -317,47 +426,22 @@ function LayerSvg({
       className="absolute inset-0 h-full w-full"
     >
       <defs>
-        {/* Vignette radial leve pra dar profundidade ao fundo */}
         <radialGradient id={`bg-${idSuffix}`} cx="50%" cy="50%" r="70%">
-          <stop offset="0%" stopColor="hsl(220 35% 10%)" />
-          <stop offset="100%" stopColor="hsl(220 50% 4%)" />
+          <stop offset="0%" stopColor="hsl(220 40% 9%)" />
+          <stop offset="100%" stopColor="hsl(220 55% 3%)" />
         </radialGradient>
         <style>{`
-          .layer-done-${idSuffix} path {
-            stroke: ${color};
-            stroke-width: 0.3;
-            fill: none;
-            stroke-linejoin: round;
-            stroke-linecap: round;
-            stroke-opacity: 0.95;
-          }
-          .layer-active-${idSuffix} path {
-            stroke: #ffffff;
-            stroke-width: 0.6;
-            fill: none;
-            stroke-linejoin: round;
-            stroke-linecap: round;
-            filter: drop-shadow(0 0 2px ${color}) drop-shadow(0 0 0.5px #fff);
-          }
-          .layer-future-${idSuffix} path {
-            stroke: hsl(220 25% 55%);
-            stroke-width: 0.18;
-            fill: none;
-            stroke-linejoin: round;
-            stroke-opacity: 0.18;
-          }
-          .layer-preview-${idSuffix} path {
-            stroke: ${color};
-            stroke-width: 0.24;
-            fill: none;
-            stroke-linejoin: round;
-            stroke-linecap: round;
-            stroke-opacity: 0.55;
-          }
+          /* DONE — sólido reduzido na cor do tool */
+          .lyr-done-${idSuffix} path { stroke-width: 0.22; stroke-opacity: 0.82; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+          /* ACTIVE — branco quente com glow do tool */
+          .lyr-active-${idSuffix} path { stroke: #ffffff; stroke-width: 0.48; stroke-opacity: 1; fill: none; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 1.5px currentColor); }
+          /* FUTURE — fantasma neutro pra manter a silhueta */
+          .lyr-future-${idSuffix} path { stroke: hsl(220 20% 50%); stroke-width: 0.14; stroke-opacity: 0.12; fill: none; stroke-linejoin: round; }
+          /* PREVIEW — quando ocioso, cor do tool meio-termo */
+          .lyr-preview-${idSuffix} path { stroke-width: 0.18; stroke-opacity: 0.42; fill: none; stroke-linejoin: round; stroke-linecap: round; }
         `}</style>
       </defs>
 
-      {/* Fundo com gradiente radial sutil pra dar depth */}
       <rect
         x={bounds.minX - pad}
         y={bounds.minY - pad}
@@ -365,17 +449,25 @@ function LayerSvg({
         height={height + pad * 2}
         fill={`url(#bg-${idSuffix})`}
       />
-      {paths.map((layerPaths, i) => (
+
+      {layerSvgs.map((toolGroups, i) => (
         <g
           key={i}
           ref={(el) => {
             if (el) groupsRef.current[i] = el;
           }}
-          className={`layer-future-${idSuffix}`}
+          className={`lyr-future-${idSuffix}`}
         >
-          {layerPaths.map((d, j) => (
-            <path key={j} d={d} />
-          ))}
+          {toolGroups.map(({ tool, paths }) => {
+            const c = colorFor(tool);
+            return (
+              <g key={tool} style={{ color: c }}>
+                {paths.map((d, j) => (
+                  <path key={j} d={d} stroke={c} />
+                ))}
+              </g>
+            );
+          })}
         </g>
       ))}
     </svg>

@@ -20,11 +20,18 @@
  * extrusão quebram a polilinha atual.
  */
 
+export interface LayerPath {
+  /** Índice do filamento usado nessa polilinha (0..3 em geral). */
+  tool: number;
+  /** Pontos XY em mm — sequência contígua de extrusão. */
+  points: number[][];
+}
+
 export interface LayerData {
   /** Altura Z (mm) no início da camada. */
   z: number;
-  /** Polilinhas de extrusão. Cada array é uma sequência contígua de pontos. */
-  paths: number[][][];
+  /** Polilinhas de extrusão, agrupadas por ferramenta ativa. */
+  paths: LayerPath[];
 }
 
 export interface GcodeMetadata {
@@ -130,11 +137,12 @@ export function parseGcodeToLayers(text: string): LayersData {
   let lastE = 0;
   let absoluteE = true;
   let absolutePos = true;
+  let currentTool = 0;
 
   const flushPath = (): void => {
     if (!currentLayer) return;
     if (pendingPath.length >= 2) {
-      currentLayer.paths.push(pendingPath);
+      currentLayer.paths.push({ tool: currentTool, points: pendingPath });
     }
     pendingPath = [];
   };
@@ -193,6 +201,15 @@ export function parseGcodeToLayers(text: string): LayersData {
     if (line.startsWith('G92')) {
       const eMatch = line.match(/E([\-0-9.]+)/);
       if (eMatch) lastE = Number(eMatch[1]);
+      continue;
+    }
+
+    // Tool change: `T0`, `T1`, …, `T3` (ou T255 = sem filamento carregado).
+    const toolMatch = /^T(\d+)\b/.exec(line);
+    if (toolMatch) {
+      flushPath();
+      const t = Number(toolMatch[1]);
+      if (t < 16) currentTool = t;
       continue;
     }
 
@@ -262,7 +279,10 @@ export function simplifyLayers(data: LayersData, threshold = 0.1): LayersData {
   const t2 = threshold * threshold;
   const simplified = data.layers.map((layer) => ({
     z: layer.z,
-    paths: layer.paths.map((path) => simplifyPath(path, t2)),
+    paths: layer.paths.map((p) => ({
+      tool: p.tool,
+      points: simplifyPath(p.points, t2),
+    })),
   }));
   return { ...data, layers: simplified };
 }
