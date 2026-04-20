@@ -40,6 +40,7 @@ import { WifiIndicator } from '@/components/wifi-indicator';
 import { FansDisplay } from '@/components/fans-display';
 import { StatRow } from '@/components/stat-row';
 import { ThumbnailPreview } from '@/components/thumbnail-preview';
+import { LayerView } from '@/components/layer-view';
 import { formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -166,10 +167,12 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             <CardTitle className="text-base">Impressão atual</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-[7rem_1fr] gap-3 items-start">
-              <ThumbnailPreview
+            <div className="grid grid-cols-[9rem_1fr] gap-3 items-start">
+              <LayerView
                 printerId={printerId}
                 cacheKey={state?.currentFile ?? null}
+                currentLayer={state?.currentLayer ?? null}
+                totalLayers={state?.totalLayers ?? null}
               />
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

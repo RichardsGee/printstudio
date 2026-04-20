@@ -12,19 +12,21 @@ import {
 import type { MqttManager } from '../mqtt/manager.js';
 import type { CameraManager } from '../camera/manager.js';
 import type { ThumbnailManager } from '../ftp/thumbnail-manager.js';
+import type { LayersManager } from '../gcode/layers-manager.js';
 import type { Logger } from '../logger.js';
 
 interface ServerOpts {
   manager: MqttManager;
   cameras: CameraManager;
   thumbnails: ThumbnailManager;
+  layers: LayersManager;
   logger: Logger;
   port: number;
   bridgeId: string;
 }
 
 export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
-  const { manager, cameras, thumbnails, logger, port, bridgeId } = opts;
+  const { manager, cameras, thumbnails, layers, logger, port, bridgeId } = opts;
 
   const app = Fastify({ logger: false });
   await app.register(cors, { origin: true });
@@ -57,6 +59,25 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
       return { commandId: result.commandId, ok: true };
     },
   );
+
+  // Parsed gcode layers (compact JSON). Frontend renders as SVG animation.
+  app.get<{ Params: { id: string } }>('/api/printers/:id/layers.json', async (req, reply) => {
+    const cached = layers.get(req.params.id);
+    if (!cached) {
+      return reply.code(404).send({ error: 'no gcode parsed yet' });
+    }
+    reply
+      .type('application/json')
+      .header('Cache-Control', 'no-store')
+      .header('Access-Control-Allow-Origin', '*')
+      .header('X-Layers-File', encodeURIComponent(cached.fileName))
+      .send({
+        fileName: cached.fileName,
+        fetchedAt: cached.fetchedAt,
+        ...cached.data,
+      });
+    return reply;
+  });
 
   // Current print-job thumbnail extracted from the printer's `.3mf` via FTPS.
   // Served as PNG with aggressive cache-busting since the underlying job changes.

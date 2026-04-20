@@ -3,6 +3,12 @@ import AdmZip from 'adm-zip';
 import { Writable } from 'node:stream';
 import type { Logger } from '../logger.js';
 
+export interface ThreeMfPayload {
+  thumbnail: Buffer | null;
+  gcode: string | null;
+  sourcePath: string;
+}
+
 /**
  * Fetches print thumbnail from a Bambu A1 via FTPS.
  *
@@ -21,6 +27,17 @@ export class ThumbnailFetcher {
   ) {}
 
   async fetchLatestThumbnail(fileNameHint?: string | null): Promise<Buffer | null> {
+    const payload = await this.fetchLatest3mf(fileNameHint);
+    return payload?.thumbnail ?? null;
+  }
+
+  /**
+   * Baixa o primeiro .3mf candidato que tiver thumbnail e/ou gcode válido,
+   * e retorna ambos num único payload. É mais eficiente que fazer duas
+   * chamadas separadas — o arquivo pode ser grande (10-50MB) e só queremos
+   * baixar uma vez.
+   */
+  async fetchLatest3mf(fileNameHint?: string | null): Promise<ThreeMfPayload | null> {
     const client = await this.connect();
     if (!client) return null;
 
@@ -30,12 +47,16 @@ export class ThumbnailFetcher {
         const buf = await this.downloadFile(client, path);
         if (!buf) continue;
         const thumb = extractPlateThumbnail(buf);
-        if (thumb) {
-          this.logger.info({ path, size: thumb.length }, 'thumbnail extracted');
-          return thumb;
+        const gcode = extractPlateGcode(buf);
+        if (thumb || gcode) {
+          this.logger.info(
+            { path, thumbBytes: thumb?.length ?? 0, gcodeBytes: gcode?.length ?? 0 },
+            '3mf contents extracted',
+          );
+          return { thumbnail: thumb, gcode, sourcePath: path };
         }
       }
-      this.logger.debug({ candidates }, 'no thumbnail found in any candidate');
+      this.logger.debug({ candidates }, 'no thumbnail/gcode found in any candidate');
       return null;
     } finally {
       client.close();
@@ -138,6 +159,23 @@ export function extractPlateThumbnail(threeMfBuf: Buffer): Buffer | null {
       entries.find((e) => /^Metadata\/.*\.png$/i.test(e.entryName));
     if (!fallback) return null;
     return fallback.getData();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract the sliced gcode text from a .3mf. Bambu Studio places it at
+ * `Metadata/plate_1.gcode`. Returns UTF-8 text, or null if not found.
+ */
+export function extractPlateGcode(threeMfBuf: Buffer): string | null {
+  try {
+    const zip = new AdmZip(threeMfBuf);
+    const entries = zip.getEntries();
+    const prefer = entries.find((e) => /^Metadata\/plate_1\.gcode$/i.test(e.entryName));
+    const fallback = prefer ?? entries.find((e) => /^Metadata\/plate_\d+\.gcode$/i.test(e.entryName));
+    if (!fallback) return null;
+    return fallback.getData().toString('utf8');
   } catch {
     return null;
   }

@@ -8,6 +8,7 @@ import { JobStore } from './storage/sqlite.js';
 import { MdnsPublisher } from './mdns.js';
 import { CameraManager } from './camera/manager.js';
 import { ThumbnailManager } from './ftp/thumbnail-manager.js';
+import { LayersManager } from './gcode/layers-manager.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -28,12 +29,17 @@ async function main(): Promise<void> {
   const cameras = new CameraManager(config.printers, logger);
 
   const thumbnails = new ThumbnailManager(config.printers, logger);
-  manager.on('state', (state) => thumbnails.onState(state));
+  const layers = new LayersManager(config.printers, logger);
+  manager.on('state', (state) => {
+    thumbnails.onState(state);
+    layers.onState(state);
+  });
 
   const server = await createServer({
     manager,
     cameras,
     thumbnails,
+    layers,
     logger,
     port: config.env.BRIDGE_PORT,
     bridgeId: config.env.BRIDGE_ID,
