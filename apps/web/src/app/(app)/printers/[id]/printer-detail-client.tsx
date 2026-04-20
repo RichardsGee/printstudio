@@ -189,8 +189,26 @@ export function PrinterDetailClient({ printerId, name }: Props) {
       {/* HMS alerts (only renders when there are errors) */}
       <HmsErrorsCard errors={state?.hmsErrors ?? []} />
 
-      {/* AMS Lite — visual replica of the physical unit */}
-      <AmsDisplay slots={state?.amsSlots ?? []} />
+      {/* Painel da impressora — foto da A1 à esquerda, AMS à direita */}
+      <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+        <div className="grid md:grid-cols-[minmax(200px,260px)_1fr] items-stretch">
+          <div className="relative bg-gradient-to-br from-muted/30 to-background md:border-r border-border/60">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/bambu-a1.png"
+              alt="Bambu Lab A1"
+              draggable={false}
+              className="h-full w-full object-contain p-4 max-h-72"
+            />
+            <div className="absolute top-2 left-3 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+              Bambu Lab A1 + AMS Lite
+            </div>
+          </div>
+          <div className="p-3">
+            <AmsDisplay slots={state?.amsSlots ?? []} bare />
+          </div>
+        </div>
+      </div>
 
       {/* Top: camera + current print */}
       <div className="grid gap-4 lg:grid-cols-5">

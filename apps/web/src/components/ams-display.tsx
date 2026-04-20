@@ -6,20 +6,28 @@ import { cn } from '@/lib/utils';
  * Compact AMS view — 4 slots rendered as spool + stats side-by-side, all
  * in a single row so they fill whatever width the parent gives us.
  */
-export function AmsDisplay({ slots }: { slots: AmsSlot[] }) {
+export function AmsDisplay({
+  slots,
+  bare = false,
+}: {
+  slots: AmsSlot[];
+  /** Quando `true`, omite o card externo — útil pra embeddar dentro de outra carteira. */
+  bare?: boolean;
+}) {
   const normalized: (AmsSlot | null)[] = [0, 1, 2, 3].map(
     (i) => slots.find((s) => s.slot === i) ?? null,
   );
 
-  return (
-    <div className="rounded-xl border border-border/60 bg-card p-3">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {normalized.map((slot, i) => (
-          <SlotCell key={i} slot={slot} index={i} />
-        ))}
-      </div>
+  const grid = (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {normalized.map((slot, i) => (
+        <SlotCell key={i} slot={slot} index={i} />
+      ))}
     </div>
   );
+
+  if (bare) return grid;
+  return <div className="rounded-xl border border-border/60 bg-card p-3">{grid}</div>;
 }
 
 function SlotCell({ slot, index }: { slot: AmsSlot | null; index: number }) {
