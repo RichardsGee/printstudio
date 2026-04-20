@@ -34,6 +34,7 @@ import { AmsDisplay } from '@/components/ams-display';
 import { HmsErrorsCard } from '@/components/hms-errors-card';
 import { CameraStream } from '@/components/camera-stream';
 import { BedCheckCard } from '@/components/bed-check';
+import { StatsStrip } from '@/components/stats-strip';
 import { FilamentSwatch } from '@/components/filament-swatch';
 import { SpeedModeIndicator } from '@/components/speed-mode-indicator';
 import { WifiIndicator } from '@/components/wifi-indicator';
@@ -367,6 +368,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Stats lifetime da impressora */}
+      <StatsStrip printerId={printerId} />
 
       {/* Bed check — verificação da chapa antes de iniciar prints */}
       <BedCheckCard printerId={printerId} />

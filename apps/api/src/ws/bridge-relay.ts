@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { BridgeMessageSchema, PrinterStateSchema, PrinterEventSchema } from '@printstudio/shared';
-import { sql } from 'drizzle-orm';
-import { printerState, events, temperatureSamples } from '@printstudio/db';
+import { and, eq, sql, isNull } from 'drizzle-orm';
+import { printerState, events, temperatureSamples, printJobs } from '@printstudio/db';
+import type { PrinterStatus } from '@printstudio/shared';
 import { db } from '../db.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
@@ -11,6 +12,32 @@ import { hub } from './hub.js';
 // printer. Em 3 printers isso dá ~4300 linhas/dia, trivial no Postgres.
 const lastSampleAt = new Map<string, number>();
 const TEMP_SAMPLE_INTERVAL_MS = 60_000;
+
+// Rastreio de status anterior por printer pra detectar transições de
+// ciclo de impressão (IDLE → PRINTING → FINISH/FAILED) e registrar em
+// `print_jobs`.
+const lastStatus = new Map<string, PrinterStatus>();
+
+type LifecycleAction =
+  | { type: 'start'; fileName: string | null }
+  | { type: 'finish'; success: boolean }
+  | null;
+
+function detectLifecycleTransition(
+  prev: PrinterStatus | undefined,
+  next: PrinterStatus,
+  fileName: string | null,
+): LifecycleAction {
+  const wasPrinting = prev === 'PRINTING' || prev === 'PREPARE' || prev === 'PAUSED';
+  const isPrinting = next === 'PRINTING' || next === 'PREPARE' || next === 'PAUSED';
+  if (!wasPrinting && isPrinting) {
+    return { type: 'start', fileName };
+  }
+  if (wasPrinting && (next === 'FINISH' || next === 'FAILED' || next === 'IDLE')) {
+    return { type: 'finish', success: next === 'FINISH' };
+  }
+  return null;
+}
 
 export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
   app.get('/ws/bridge', { websocket: true }, (socket, req) => {
@@ -141,6 +168,46 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
                 updatedAt: sql`excluded.updated_at`,
               },
             });
+
+          // Detecta transições de lifecycle e grava em print_jobs.
+          const prevStatus = lastStatus.get(state.printerId);
+          const lifecycleAction = detectLifecycleTransition(
+            prevStatus,
+            state.status,
+            state.currentFile,
+          );
+          lastStatus.set(state.printerId, state.status);
+
+          if (lifecycleAction?.type === 'start' && lifecycleAction.fileName) {
+            // Cria uma nova linha RUNNING. Se já existir uma RUNNING aberta
+            // pra esse printer, fecha como CANCELLED primeiro pra não gerar
+            // ghosts (caso tenhamos perdido o evento de fim anterior).
+            void db
+              .update(printJobs)
+              .set({ status: 'CANCELLED', finishedAt: new Date() })
+              .where(and(eq(printJobs.printerId, state.printerId), eq(printJobs.status, 'RUNNING')))
+              .then(() =>
+                db.insert(printJobs).values({
+                  printerId: state.printerId,
+                  fileName: lifecycleAction.fileName ?? 'sem nome',
+                  startedAt: new Date(),
+                  status: 'RUNNING',
+                  layersTotal: state.totalLayers ?? null,
+                }),
+              )
+              .catch((err) => logger.warn({ err }, 'print_jobs: start insert failed'));
+          } else if (lifecycleAction?.type === 'finish') {
+            void db
+              .update(printJobs)
+              .set({
+                status: lifecycleAction.success ? 'SUCCESS' : 'FAILED',
+                finishedAt: new Date(),
+                durationSec: sql`EXTRACT(EPOCH FROM (NOW() - ${printJobs.startedAt}))::int`,
+                layersTotal: state.totalLayers ?? null,
+              })
+              .where(and(eq(printJobs.printerId, state.printerId), eq(printJobs.status, 'RUNNING')))
+              .catch((err) => logger.warn({ err }, 'print_jobs: finish update failed'));
+          }
 
           // Arquiva amostra de temperatura throttled a 1/min pra o gráfico de 24h.
           if (state.nozzleTemp !== null || state.bedTemp !== null) {
