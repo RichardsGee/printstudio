@@ -205,6 +205,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             <AmsDisplay
               slots={state?.amsSlots ?? []}
               units={state?.amsUnits ?? []}
+              model="A1"
               bare
             />
           </div>

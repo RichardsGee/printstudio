@@ -10,11 +10,15 @@ import { cn } from '@/lib/utils';
 export function AmsDisplay({
   slots,
   units = [],
+  /** Modelo da impressora — AMS Lite (A1) não tem sensor físico de humidade/temp,
+   *  então a Bambu reporta valores placeholder (geralmente level 5, tempC 0).
+   *  Esconder a barra nesse caso evita informação enganosa. */
+  model,
   bare = false,
 }: {
   slots: AmsSlot[];
   units?: AmsUnit[];
-  /** Quando `true`, omite o card externo — útil pra embeddar dentro de outra carteira. */
+  model?: string | null;
   bare?: boolean;
 }) {
   const normalized: (AmsSlot | null)[] = [0, 1, 2, 3].map(
@@ -22,12 +26,13 @@ export function AmsDisplay({
   );
 
   const unit = units[0] ?? null;
+  const isAmsLite = (model ?? '').toUpperCase().startsWith('A1');
+  const showUnitBar =
+    unit && !isAmsLite && (unit.humidityLevel !== null || (unit.tempC !== null && unit.tempC > 0));
 
   const body = (
     <div className="space-y-2">
-      {unit && (unit.humidityLevel !== null || unit.tempC !== null) ? (
-        <AmsUnitBar unit={unit} />
-      ) : null}
+      {showUnitBar ? <AmsUnitBar unit={unit} /> : null}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {normalized.map((slot, i) => (
           <SlotCell key={i} slot={slot} index={i} />
