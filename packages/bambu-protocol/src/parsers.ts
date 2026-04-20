@@ -96,18 +96,57 @@ export function parseFanPct(v: string | number | undefined): number | null {
   return n <= 15 ? Math.round((n / 15) * 100) : Math.min(100, Math.round(n));
 }
 
+/**
+ * Mapa dos estágios `mc_print_stage` publicados pela A1.
+ * Códigos vindos da documentação e engenharia reversa da Bambu —
+ * cobrem desde preparações iniciais até pausas e finalização.
+ */
 const STAGE_MAP: Record<string, string> = {
+  '-1': 'Ocioso',
   '0': 'Preparando',
   '1': 'Imprimindo',
-  '2': 'Auto bed leveling',
-  '3': 'Pré-aquecendo cama',
+  '2': 'Nivelando mesa',
+  '3': 'Pré-aquecendo mesa',
   '4': 'Limpando bico',
   '5': 'Verificando fluxo',
-  '6': 'Calibrando',
+  '6': 'Calibrando Z',
   '7': 'Carregando filamento',
-  '8': 'Descarregando',
+  '8': 'Descarregando filamento',
   '9': 'Trocando filamento',
+  '10': 'Pausa M400',
+  '11': 'Pausa por acabou filamento',
+  '12': 'Aquecendo bico',
+  '13': 'Calibrando extrusão',
   '14': 'Pausado',
+  '15': 'Scanning da mesa',
+  '16': 'Inspecionando primeira camada',
+  '17': 'Identificando placa',
+  '18': 'Calibrando Micro Lidar',
+  '19': 'Homing',
+  '20': 'Limpando ponta do bico',
+  '21': 'Verificando temperatura do bico',
+  '22': 'Pausado pelo usuário',
+  '23': 'Pausa por tampa aberta',
+  '24': 'Calibrando Micro Lidar',
+  '25': 'Calibrando fluxo de extrusão',
+  '26': 'Pausa por temperatura do bico',
+  '27': 'Pausa por temperatura da mesa',
+  '28': 'Cortando filamento',
+  '29': 'Pausa (skip step)',
+  '30': 'Carregando filamento',
+  '31': 'Calibrando ruído do motor',
+  '32': 'Pausa por AMS desconectado',
+  '33': 'Pausa por ventoinha lenta',
+  '34': 'Pausa por temperatura da câmara',
+  '35': 'Resfriando câmara',
+  '36': 'Pausa via G-code',
+  '37': 'Demo de ruído do motor',
+  '38': 'Calibrando temperatura do hotend',
+  '39': 'Guardando arquivo',
+  '40': 'Encerrando impressão',
+  '41': 'Finalizando',
+  '42': 'Terminado',
+  '255': 'Ocioso',
 };
 
 export function mapStage(stage?: string): string | null {
@@ -129,9 +168,18 @@ export function applyReport(
   }
   const nozzleDiameter =
     print.nozzle_diameter !== undefined ? String(print.nozzle_diameter) : previous.nozzleDiameter;
+  const status = print.gcode_state !== undefined ? mapGcodeState(print.gcode_state) : previous.status;
+  const rawStage = print.mc_print_stage !== undefined ? mapStage(print.mc_print_stage) : previous.stage;
+  // Em status terminais (FINISH/IDLE/FAILED), suprime o stage antigo
+  // — evita mostrar "Concluído" + "Imprimindo" simultaneamente quando
+  // a Bambu demora um ciclo pra atualizar `mc_print_stage`.
+  const stage =
+    status === 'FINISH' || status === 'IDLE' || status === 'FAILED' || status === 'OFFLINE'
+      ? null
+      : rawStage;
   return {
     ...previous,
-    status: print.gcode_state !== undefined ? mapGcodeState(print.gcode_state) : previous.status,
+    status,
     progressPct: print.mc_percent ?? previous.progressPct,
     remainingSec:
       typeof print.mc_remaining_time === 'number'
@@ -167,7 +215,7 @@ export function applyReport(
       print.big_fan2_speed !== undefined ? parseFanPct(print.big_fan2_speed) : previous.fanChamberPct,
     nozzleDiameter,
     nozzleType: print.nozzle_type ?? previous.nozzleType,
-    stage: print.mc_print_stage !== undefined ? mapStage(print.mc_print_stage) : previous.stage,
+    stage,
     updatedAt: new Date().toISOString(),
   };
 }
