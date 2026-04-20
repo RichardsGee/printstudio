@@ -40,7 +40,7 @@ import { WifiIndicator } from '@/components/wifi-indicator';
 import { FansDisplay } from '@/components/fans-display';
 import { StatRow } from '@/components/stat-row';
 import { PrintPreview } from '@/components/print-preview';
-import { formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
+import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
   printerId: string;
@@ -285,25 +285,28 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               </div>
             </div>
 
-            {/* Barra de progresso grande */}
-            <div>
-              <div className="flex items-baseline justify-between mb-1">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold tabular-nums leading-none">
-                    {progress.toFixed(1)}
-                  </span>
-                  <span className="text-sm text-muted-foreground">%</span>
-                </div>
-                <span className="text-xs font-mono text-muted-foreground">
-                  Camada {state?.currentLayer ?? '—'}/{state?.totalLayers ?? '—'}
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-                />
-              </div>
+            {/* Progresso geral + camadas — mesmo estilo, valores grandes */}
+            <div className="space-y-2.5">
+              <ProgressMetric
+                label="Progresso"
+                primary={`${progress.toFixed(1)}%`}
+                percent={progress}
+                accent="primary"
+              />
+              <ProgressMetric
+                label="Camadas"
+                primary={
+                  state?.currentLayer != null && state?.totalLayers != null
+                    ? `${state.currentLayer}/${state.totalLayers}`
+                    : '—'
+                }
+                percent={
+                  state?.currentLayer != null && state?.totalLayers
+                    ? (state.currentLayer / state.totalLayers) * 100
+                    : 0
+                }
+                accent="emerald"
+              />
             </div>
 
             {/* Footer: ETA + restante + velocidade, alinhado em grid regular */}
@@ -459,11 +462,45 @@ export function PrinterDetailClient({ printerId, name }: Props) {
 
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 flex flex-col">
+    <div className="rounded-md border border-border/60 bg-gradient-to-b from-muted/30 to-muted/10 px-2.5 py-1.5 flex flex-col gap-0.5">
       <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <span className="text-sm font-medium tabular-nums">{value}</span>
+      <span className="text-sm font-semibold tabular-nums leading-tight">{value}</span>
+    </div>
+  );
+}
+
+function ProgressMetric({
+  label,
+  primary,
+  percent,
+  accent,
+}: {
+  label: string;
+  primary: string;
+  percent: number;
+  accent: 'primary' | 'emerald';
+}) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const barColor =
+    accent === 'primary'
+      ? 'bg-gradient-to-r from-primary/80 to-primary'
+      : 'bg-gradient-to-r from-emerald-500/80 to-emerald-400';
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        <span className="text-sm font-semibold tabular-nums">{primary}</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-muted/60 overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-500 ease-out', barColor)}
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
     </div>
   );
 }
