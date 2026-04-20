@@ -10,16 +10,15 @@ import { cn } from '@/lib/utils';
 export function AmsDisplay({
   slots,
   units = [],
-  /** Modelo da impressora — AMS Lite (A1) não tem sensor físico de humidade/temp,
-   *  então a Bambu reporta valores placeholder (geralmente level 5, tempC 0).
-   *  Esconder a barra nesse caso evita informação enganosa. */
   model,
   bare = false,
+  compact = false,
 }: {
   slots: AmsSlot[];
   units?: AmsUnit[];
   model?: string | null;
   bare?: boolean;
+  compact?: boolean;
 }) {
   const normalized: (AmsSlot | null)[] = [0, 1, 2, 3].map(
     (i) => slots.find((s) => s.slot === i) ?? null,
@@ -33,9 +32,9 @@ export function AmsDisplay({
   const body = (
     <div className="space-y-2">
       {showUnitBar ? <AmsUnitBar unit={unit} /> : null}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className={cn('grid gap-2 grid-cols-4', !compact && 'md:gap-3')}>
         {normalized.map((slot, i) => (
-          <SlotCell key={i} slot={slot} index={i} />
+          <SlotCell key={i} slot={slot} index={i} compact={compact} />
         ))}
       </div>
     </div>
@@ -94,10 +93,49 @@ function AmsUnitBar({ unit }: { unit: AmsUnit }) {
   );
 }
 
-function SlotCell({ slot, index }: { slot: AmsSlot | null; index: number }) {
+function SlotCell({
+  slot,
+  index,
+  compact,
+}: {
+  slot: AmsSlot | null;
+  index: number;
+  compact?: boolean;
+}) {
   const active = !!slot?.active;
   const pct = slot?.remainingPct ?? null;
   const color = normalizeHex(slot?.color);
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          'flex flex-col items-center gap-1 rounded-lg border px-1.5 py-1.5',
+          active ? 'border-primary/50 bg-primary/[0.03]' : 'border-border/40',
+        )}
+      >
+        <Spool color={slot?.color ?? null} active={active} rotating={active} size={56} />
+        <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+          SLOT {index + 1}
+        </div>
+        <div className="flex items-center gap-1 w-full justify-center">
+          <div
+            className={cn(
+              'h-2 w-2 rounded-full shrink-0 ring-1 ring-border',
+              !color && 'bg-muted/40',
+            )}
+            style={color ? { backgroundColor: color } : undefined}
+          />
+          <span className="text-[10px] truncate">{slot?.filamentType ?? '—'}</span>
+        </div>
+        {pct !== null ? (
+          <span className="text-[9px] font-mono tabular-nums text-muted-foreground">
+            {Math.round(pct)}%
+          </span>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div

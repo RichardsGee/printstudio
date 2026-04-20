@@ -203,46 +203,124 @@ export function PrinterDetailClient({ printerId, name }: Props) {
       {/* HMS alerts (só renderiza se houver) */}
       <HmsErrorsCard errors={state?.hmsErrors ?? []} />
 
-      {/* Painel da impressora — A1 compacta + AMS, tudo numa linha curta */}
+      {/* Linha do fluxo: A1 | AMS | PTFE | Impressão atual, tudo no mesmo card */}
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-        <div className="grid md:grid-cols-[minmax(130px,160px)_1fr] items-stretch">
-          <div className="relative bg-gradient-to-br from-muted/30 to-background md:border-r border-border/60 flex items-center justify-center">
+        <div className="grid lg:grid-cols-[120px_minmax(360px,auto)_minmax(90px,120px)_minmax(420px,1fr)] items-stretch">
+          {/* A1 image */}
+          <div className="relative bg-gradient-to-br from-muted/30 to-background lg:border-r border-border/60 flex items-center justify-center p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/bambu-a1.png"
               alt="Bambu Lab A1"
               draggable={false}
-              className="max-h-36 max-w-full object-contain p-2"
+              className="max-h-28 w-auto object-contain"
             />
-            <div className="absolute top-1.5 left-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
-              A1 + AMS
-            </div>
+            <span className="absolute top-1.5 left-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+              A1
+            </span>
           </div>
-          <div className="p-2.5 space-y-2">
+
+          {/* AMS 4 slots compactos */}
+          <div className="p-3 lg:border-r border-border/60 flex flex-col justify-center gap-2">
+            <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+              AMS Lite
+            </div>
             <AmsDisplay
               slots={state?.amsSlots ?? []}
               units={state?.amsUnits ?? []}
               model="A1"
               bare
+              compact
             />
-            {/* Fluxo AMS → bico, visível quando imprimindo */}
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground shrink-0">
-                AMS → bico
-              </span>
-              <PtfeTube
-                color={activeSlot?.color ?? null}
-                active={state?.status === 'PRINTING'}
-                className="flex-1"
+          </div>
+
+          {/* Bridge PTFE conectando AMS → Impressão atual */}
+          <div className="flex flex-col items-center justify-center gap-1.5 lg:border-r border-border/60 px-2 py-3">
+            <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+              AMS → BICO
+            </span>
+            <PtfeTube
+              color={activeSlot?.color ?? null}
+              active={state?.status === 'PRINTING'}
+              className="w-full"
+            />
+          </div>
+
+          {/* Impressão atual compacta */}
+          <div className="p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+                Impressão atual
+              </div>
+              {activeSlot ? (
+                <div className="flex items-center gap-1.5">
+                  <FilamentSwatch color={activeSlot.color ?? null} active size="sm" />
+                  <span className="text-[10px] text-muted-foreground">
+                    slot {activeSlot.slot + 1}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-[6rem_1fr] gap-2.5 items-start">
+              <PrintPreview
+                printerId={printerId}
+                cacheKey={state?.currentFile ?? null}
+                currentLayer={state?.currentLayer ?? null}
+                totalLayers={state?.totalLayers ?? null}
+                filamentColor={activeSlot?.color ?? null}
+              />
+
+              <div className="min-w-0 space-y-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate" title={state?.currentFile ?? ''}>
+                    {state?.currentFile ?? '—'}
+                  </div>
+                </div>
+
+                <ProgressMetric
+                  label="Progresso"
+                  primary={`${progress.toFixed(1)}%`}
+                  percent={progress}
+                  accent="primary"
+                />
+                <ProgressMetric
+                  label="Camadas"
+                  primary={
+                    state?.currentLayer != null && state?.totalLayers != null
+                      ? `${state.currentLayer}/${state.totalLayers}`
+                      : '—'
+                  }
+                  percent={
+                    state?.currentLayer != null && state?.totalLayers
+                      ? (state.currentLayer / state.totalLayers) * 100
+                      : 0
+                  }
+                  accent="emerald"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5 pt-1.5 border-t border-border/40">
+              <InfoPill label="Termina" value={formatEtaClock(state?.remainingSec)} />
+              <InfoPill label="Restante" value={formatDuration(state?.remainingSec)} />
+              <InfoPill
+                label="Veloc."
+                value={state?.speedPercent != null ? `${Math.round(state.speedPercent)}%` : '—'}
+              />
+              <FilamentUsage
+                printerId={printerId}
+                cacheKey={state?.currentFile ?? null}
+                progressPct={progress}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Grade principal: câmera + impressão atual + sensores na mesma linha */}
+      {/* Segunda linha: câmera + sensores */}
       <div className="grid gap-3 lg:grid-cols-12">
-        <Card className="lg:col-span-4">
+        <Card className="lg:col-span-8">
           <CardHeader className="pb-2 flex-row items-center justify-between">
             <CardTitle className="text-sm">Câmera</CardTitle>
             <div className="flex items-center gap-2">
@@ -255,92 +333,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Impressão atual</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-3 space-y-3">
-            {/* Linha superior: preview + arquivo + filamento */}
-            <div className="grid grid-cols-[10rem_1fr] gap-3 items-center">
-              <PrintPreview
-                printerId={printerId}
-                cacheKey={state?.currentFile ?? null}
-                currentLayer={state?.currentLayer ?? null}
-                totalLayers={state?.totalLayers ?? null}
-                filamentColor={activeSlot?.color ?? null}
-              />
-
-              <div className="min-w-0 space-y-2">
-                <div>
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                    Arquivo
-                  </div>
-                  <div className="text-sm font-medium truncate" title={state?.currentFile ?? ''}>
-                    {state?.currentFile ?? '—'}
-                  </div>
-                </div>
-
-                {activeSlot ? (
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                      Filamento
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <FilamentSwatch color={activeSlot.color ?? null} active size="sm" />
-                      <span className="text-xs truncate">
-                        {activeSlot.filamentType ?? 'Filamento'} — slot {activeSlot.slot + 1}
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Progresso geral + camadas — mesmo estilo, valores grandes */}
-            <div className="space-y-2.5">
-              <ProgressMetric
-                label="Progresso"
-                primary={`${progress.toFixed(1)}%`}
-                percent={progress}
-                accent="primary"
-              />
-              <ProgressMetric
-                label="Camadas"
-                primary={
-                  state?.currentLayer != null && state?.totalLayers != null
-                    ? `${state.currentLayer}/${state.totalLayers}`
-                    : '—'
-                }
-                percent={
-                  state?.currentLayer != null && state?.totalLayers
-                    ? (state.currentLayer / state.totalLayers) * 100
-                    : 0
-                }
-                accent="emerald"
-              />
-            </div>
-
-            {/* Footer: ETA + restante + velocidade + filamento, grid 4 cols */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-border/40 text-xs">
-              <InfoPill label="Termina às" value={formatEtaClock(state?.remainingSec)} />
-              <InfoPill label="Restante" value={formatDuration(state?.remainingSec)} />
-              <InfoPill
-                label="Velocidade"
-                value={
-                  state?.speedPercent != null ? `${Math.round(state.speedPercent)}%` : '—'
-                }
-              />
-              <FilamentUsage
-                printerId={printerId}
-                cacheKey={state?.currentFile ?? null}
-                progressPct={progress}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Sensores compactos ao lado, stacked vertical */}
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-4">
           <CardHeader className="pb-2 flex-row items-center justify-between">
             <CardTitle className="text-sm">Sensores</CardTitle>
             <PowerUsage state={state} />
