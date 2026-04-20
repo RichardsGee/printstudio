@@ -17,9 +17,10 @@ export interface PrinterClientEvents {
   event: (event: PrinterEvent) => void;
 }
 
-// Throttle state emits so we don't flood downstream consumers on every
-// temperature tick (Bambu publishes reports multiple times per second).
-const STATE_EMIT_THROTTLE_MS = 1000;
+// Throttle state emits so we don't flood downstream consumers — mas
+// ainda dá sensação de real-time. 500ms = 2 updates/s, o suficiente
+// pra temperatura/progresso parecerem contínuos sem saturar a WS.
+const STATE_EMIT_THROTTLE_MS = 500;
 
 export class PrinterClient extends EventEmitter {
   private client: MqttClient | null = null;
