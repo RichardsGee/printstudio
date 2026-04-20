@@ -1,0 +1,27 @@
+{
+  "name": "@printstudio/bambu-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript implementation of Bambu Lab MQTT protocol (based on OpenBambuAPI spec)",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./topics": "./src/topics.ts",
+    "./parsers": "./src/parsers.ts",
+    "./commands": "./src/commands.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet'"
+  },
+  "dependencies": {
+    "@printstudio/shared": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

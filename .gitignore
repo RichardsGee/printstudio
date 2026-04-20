@@ -1,0 +1,66 @@
+# =============================================================================
+# PrintStudio — .gitignore
+# =============================================================================
+
+# Env files — NUNCA commitar
+.env
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.local
+packages/*/.env
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SQLite local (bridge)
+apps/bridge/data/
+*.sqlite
+*.sqlite-journal
+*.db
+
+# go2rtc
+go2rtc.yaml.local
+recordings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea/
+*.swp
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Temp
+tmp/
+temp/
+.cache/
+
+# AIOX runtime
+.aiox/handoffs/
+.aiox/logs/

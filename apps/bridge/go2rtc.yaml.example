@@ -1,0 +1,29 @@
+# go2rtc config for the 3 PrintStudio Bambu Lab A1 cameras.
+# Docs: https://github.com/AlexxIT/go2rtc
+#
+# RTSP URL pattern for Bambu A1 in LAN mode:
+#   rtsps://bblp:{ACCESS_CODE}@{PRINTER_IP}:322/streaming/live/1
+#
+# Note the 'rtsps' (TLS). Bambu uses a self-signed cert, which is why we set
+# insecure: true below.
+
+api:
+  listen: ":1984"
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555"
+
+streams:
+  printer_1:
+    - rtsps://bblp:CHANGE_ME@192.168.1.101:322/streaming/live/1
+  printer_2:
+    - rtsps://bblp:CHANGE_ME@192.168.1.102:322/streaming/live/1
+  printer_3:
+    - rtsps://bblp:CHANGE_ME@192.168.1.103:322/streaming/live/1
+
+# Bambu uses self-signed TLS on the camera endpoint — allow it.
+rtsp_client:
+  insecure: true
