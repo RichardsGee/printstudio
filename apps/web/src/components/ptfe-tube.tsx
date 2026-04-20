@@ -5,23 +5,28 @@ import { cn } from '@/lib/utils';
 interface Props {
   /** Cor hex do filamento em trânsito — pode ser null quando sem info. */
   color?: string | null;
-  /** Quando true, anima um brilho "viajando" sobre o filamento. */
+  /** Quando true, anima o fluxo de chevrons se movendo pelo tubo. */
   active: boolean;
   className?: string;
 }
 
 /**
- * Tubo PTFE com filamento **contínuo e inteiriço** por dentro. Quando
- * `active`, um brilho translúcido viaja por cima do filamento da
- * esquerda pra direita, indicando fluxo sem cortar o filamento (a
- * versão anterior empilhava 2 segmentos e parecia cortado).
- *
- * Estilo: tubo levemente escuro com reflexo superior, filamento
- * sólido na cor do carrier ativo, e um highlight gradiente animado
- * por cima quando em trânsito.
+ * Tubo PTFE com fluxo de chevrons (>>>>) se movendo da esquerda
+ * pra direita indicando o deslocamento do filamento dentro do
+ * tubo. Os chevrons herdam a cor do filamento ativo e fazem um
+ * loop suave — pacing calibrado pra parecer fluxo contínuo de
+ * extrusão, não viagem da cabeça.
  */
 export function PtfeTube({ color, active, className }: Props) {
   const tint = normalize(color) ?? '#3b82f6';
+  // SVG inline de 1 chevron em data-URI — tinted com a cor do filamento.
+  // Escapar o `#` do hex (URI reserved). stroke-linecap round dá ponta
+  // suave; viewBox estreito deixa os chevrons próximos uns dos outros.
+  const chevron = encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='14' height='12' viewBox='0 0 14 12'><path d='M2 2 L7 6 L2 10' fill='none' stroke='${tint}' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>`,
+  );
+  const chevronUrl = `url("data:image/svg+xml;utf8,${chevron}")`;
+
   return (
     <div
       className={cn(
@@ -33,36 +38,28 @@ export function PtfeTube({ color, active, className }: Props) {
       {/* Reflexo superior pra dar volume ao tubo */}
       <div className="absolute inset-x-0 top-0 h-[30%] bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
 
-      {/* Filamento contínuo — uma linha só atravessando o tubo todo */}
+      {/* Faixa de chevrons — opacidade reduzida quando inativo, */}
+      {/* scroll horizontal infinito quando active. */}
       <div
-        className="absolute top-1/2 left-[6%] right-[6%] -translate-y-1/2 h-[4px] rounded-full"
+        className="absolute inset-x-[6%] top-1/2 -translate-y-1/2 h-3 pointer-events-none"
         style={{
-          backgroundColor: tint,
-          boxShadow: `0 0 3px ${tint}80`,
+          backgroundImage: chevronUrl,
+          backgroundRepeat: 'repeat-x',
+          backgroundSize: '14px 100%',
+          backgroundPosition: 'left center',
+          opacity: active ? 1 : 0.25,
+          animation: active ? 'ptfe-chevron 1.6s linear infinite' : 'none',
+          filter: `drop-shadow(0 0 1px ${tint}80)`,
         }}
       />
 
-      {/* Brilho viajante — só quando imprimindo. Passa sobre o filamento
-          indicando fluxo sem interromper o segmento contínuo. */}
-      {active ? (
-        <div
-          className="absolute top-1/2 left-[6%] right-[6%] -translate-y-1/2 h-[6px] rounded-full pointer-events-none"
-          style={{
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.65) 50%, transparent 100%)',
-            backgroundSize: '30% 100%',
-            backgroundRepeat: 'no-repeat',
-            animation: 'ptfe-flow 9s linear infinite',
-          }}
-        />
-      ) : null}
-
       <style jsx>{`
-        @keyframes ptfe-flow {
+        @keyframes ptfe-chevron {
           0% {
-            background-position: -30% 0;
+            background-position-x: 0;
           }
           100% {
-            background-position: 130% 0;
+            background-position-x: 14px;
           }
         }
       `}</style>
