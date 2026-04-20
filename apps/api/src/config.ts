@@ -9,6 +9,11 @@ const ConfigSchema = z.object({
   API_CORS_ORIGIN: z.string().url(),
   AUTH_SECRET: z.string().min(16),
   CLOUD_API_TOKEN: z.string().min(16),
+  // Notificações — opcionais. Se ambos presentes, eventos críticos
+  // (HMS fatal/error, falha de impressão, porta aberta) disparam msg
+  // via Bot API do Telegram.
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_CHAT_ID: z.string().optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { BridgeMessageSchema, PrinterStateSchema, PrinterEventSchema } from '@printstudio/shared';
 import { and, eq, sql, isNull } from 'drizzle-orm';
-import { printerState, events, temperatureSamples, printJobs } from '@printstudio/db';
+import { printerState, events, temperatureSamples, printJobs, printers as printersTable } from '@printstudio/db';
 import type { PrinterStatus } from '@printstudio/shared';
+import { processStateAlerts } from '../notifier/alerts.js';
 import { db } from '../db.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
@@ -12,6 +13,20 @@ import { hub } from './hub.js';
 // printer. Em 3 printers isso dá ~4300 linhas/dia, trivial no Postgres.
 const lastSampleAt = new Map<string, number>();
 const TEMP_SAMPLE_INTERVAL_MS = 60_000;
+
+// Cache de nome humano por printerId pra usar nas notificações.
+// Populado on-demand no primeiro state recebido.
+const printerNames = new Map<string, string>();
+
+async function ensurePrinterName(printerId: string): Promise<void> {
+  if (printerNames.has(printerId)) return;
+  const rows = await db
+    .select({ name: printersTable.name })
+    .from(printersTable)
+    .where(eq(printersTable.id, printerId))
+    .limit(1);
+  if (rows[0]) printerNames.set(printerId, rows[0].name);
+}
 
 // Rastreio de status anterior por printer pra detectar transições de
 // ciclo de impressão (IDLE → PRINTING → FINISH/FAILED) e registrar em
@@ -225,6 +240,13 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
               }).catch((err) => logger.warn({ err }, 'temperature sample insert failed'));
             }
           }
+
+          // Alertas baseados em transições de estado (HMS crítico, falha,
+          // porta aberta, conclusão). Disparo assíncrono — não bloqueia
+          // o broadcast nem o relay.
+          void ensurePrinterName(state.printerId).then(() =>
+            processStateAlerts(state, printerNames),
+          );
 
           hub.broadcast(state.printerId, { type: 'printer.state', payload: state });
         } else if (msg.type === 'bridge.event') {
