@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { printers, printerState } from '@printstudio/db';
+import { and, eq, gte, sql } from 'drizzle-orm';
+import { printers, printerState, temperatureSamples } from '@printstudio/db';
 import { db } from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
@@ -69,6 +69,58 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
     if (!updated) return reply.code(404).send({ error: 'not found' });
     return updated;
   });
+
+  /**
+   * Histórico de temperaturas com time-bucketing SQL. Retorna no máximo
+   * ~300 pontos mesmo pra janelas longas, evitando payload pesado.
+   */
+  // Sem auth gate no MVP — consistente com /ws/client, e o LAN
+  // bridge é o único que popula esses dados.
+  app.get(
+    '/api/printers/:id/temperatures',
+    async (req, reply) => {
+      const parse = IdParamSchema.safeParse(req.params);
+      if (!parse.success) return reply.code(400).send({ error: 'invalid id' });
+
+      const q = z
+        .object({ hours: z.coerce.number().int().min(1).max(168).default(24) })
+        .safeParse(req.query);
+      if (!q.success) return reply.code(400).send({ error: 'invalid query' });
+
+      const hoursBack = q.data.hours;
+      const since = new Date(Date.now() - hoursBack * 3_600_000);
+      // Bucket size: 24h → 5min, 168h → ~35min. Sempre ~288 pontos.
+      const bucketSec = Math.max(60, Math.round((hoursBack * 3600) / 288));
+
+      const rows = await db
+        .select({
+          bucket: sql<string>`date_bin(${sql.raw(`interval '${bucketSec} seconds'`)}, ${temperatureSamples.recordedAt}, timestamptz 'epoch')`.as('bucket'),
+          nozzleAvg: sql<number>`avg(${temperatureSamples.nozzleTemp})`.as('nozzle_avg'),
+          bedAvg: sql<number>`avg(${temperatureSamples.bedTemp})`.as('bed_avg'),
+          chamberAvg: sql<number>`avg(${temperatureSamples.chamberTemp})`.as('chamber_avg'),
+        })
+        .from(temperatureSamples)
+        .where(
+          and(
+            eq(temperatureSamples.printerId, parse.data.id),
+            gte(temperatureSamples.recordedAt, since),
+          ),
+        )
+        .groupBy(sql`bucket`)
+        .orderBy(sql`bucket`);
+
+      return {
+        hours: hoursBack,
+        bucketSec,
+        points: rows.map((r) => ({
+          t: r.bucket,
+          nozzle: r.nozzleAvg != null ? Number(r.nozzleAvg) : null,
+          bed: r.bedAvg != null ? Number(r.bedAvg) : null,
+          chamber: r.chamberAvg != null ? Number(r.chamberAvg) : null,
+        })),
+      };
+    },
+  );
 
   app.delete('/api/printers/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const parse = IdParamSchema.safeParse(req.params);

@@ -1,11 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { BridgeMessageSchema, PrinterStateSchema, PrinterEventSchema } from '@printstudio/shared';
 import { sql } from 'drizzle-orm';
-import { printerState, events } from '@printstudio/db';
+import { printerState, events, temperatureSamples } from '@printstudio/db';
 import { db } from '../db.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { hub } from './hub.js';
+
+// Throttle de inserts em temperature_samples — 1 amostra/minuto por
+// printer. Em 3 printers isso dá ~4300 linhas/dia, trivial no Postgres.
+const lastSampleAt = new Map<string, number>();
+const TEMP_SAMPLE_INTERVAL_MS = 60_000;
 
 export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
   app.get('/ws/bridge', { websocket: true }, (socket, req) => {
@@ -120,6 +125,23 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
                 updatedAt: sql`excluded.updated_at`,
               },
             });
+
+          // Arquiva amostra de temperatura throttled a 1/min pra o gráfico de 24h.
+          if (state.nozzleTemp !== null || state.bedTemp !== null) {
+            const now = Date.now();
+            const last = lastSampleAt.get(state.printerId) ?? 0;
+            if (now - last >= TEMP_SAMPLE_INTERVAL_MS) {
+              lastSampleAt.set(state.printerId, now);
+              void db.insert(temperatureSamples).values({
+                printerId: state.printerId,
+                nozzleTemp: state.nozzleTemp?.toString() ?? null,
+                nozzleTargetTemp: state.nozzleTargetTemp?.toString() ?? null,
+                bedTemp: state.bedTemp?.toString() ?? null,
+                bedTargetTemp: state.bedTargetTemp?.toString() ?? null,
+                chamberTemp: state.chamberTemp?.toString() ?? null,
+              }).catch((err) => logger.warn({ err }, 'temperature sample insert failed'));
+            }
+          }
 
           hub.broadcast(state.printerId, { type: 'printer.state', payload: state });
         } else if (msg.type === 'bridge.event') {

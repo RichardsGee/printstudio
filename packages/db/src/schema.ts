@@ -90,6 +90,24 @@ export const printJobs = pgTable('print_jobs', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Histórico de temperaturas por printer. Inserção throttled a 1
+ * amostra/minuto — pra 3 impressoras isso dá ~4300 linhas/dia,
+ * trivial em Postgres. O endpoint faz time-bucket no SELECT.
+ */
+export const temperatureSamples = pgTable('temperature_samples', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  printerId: uuid('printer_id')
+    .references(() => printers.id, { onDelete: 'cascade' })
+    .notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).defaultNow().notNull(),
+  nozzleTemp: numeric('nozzle_temp', { precision: 5, scale: 1 }),
+  nozzleTargetTemp: numeric('nozzle_target_temp', { precision: 5, scale: 1 }),
+  bedTemp: numeric('bed_temp', { precision: 5, scale: 1 }),
+  bedTargetTemp: numeric('bed_target_temp', { precision: 5, scale: 1 }),
+  chamberTemp: numeric('chamber_temp', { precision: 5, scale: 1 }),
+});
+
 export const events = pgTable('events', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   printerId: uuid('printer_id').references(() => printers.id, { onDelete: 'cascade' }),
@@ -174,3 +192,5 @@ export type NewEvent = typeof events.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
+export type TemperatureSample = typeof temperatureSamples.$inferSelect;
+export type NewTemperatureSample = typeof temperatureSamples.$inferInsert;

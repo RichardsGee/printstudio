@@ -52,7 +52,11 @@ interface TempPoint {
   t: number;
   nozzle: number | null;
   bed: number | null;
+  chamber?: number | null;
 }
+
+const TEMP_WINDOW_HOURS = 24;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export function PrinterDetailClient({ printerId, name }: Props) {
   const { wsUrl, detecting } = useConnection();
@@ -63,24 +67,61 @@ export function PrinterDetailClient({ printerId, name }: Props) {
   const [events, setEvents] = useState<PrinterEvent[]>([]);
   const clientRef = useRef<WsClient | null>(null);
 
+  // Carrega histórico de 24h do endpoint na montagem, e depois vai
+  // recebendo atualizações em tempo real via WS — amostras novas
+  // chegam a ~1/min (matching do throttle de insert no bridge-relay).
+  useEffect(() => {
+    let alive = true;
+    fetch(`${API_URL}/api/printers/${printerId}/temperatures?hours=${TEMP_WINDOW_HOURS}`, {
+      credentials: 'include',
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { points: Array<{ t: string; nozzle: number | null; bed: number | null; chamber: number | null }> }) => {
+        if (!alive) return;
+        setHistory(
+          data.points.map((p) => ({
+            t: new Date(p.t).getTime(),
+            nozzle: p.nozzle,
+            bed: p.bed,
+            chamber: p.chamber,
+          })),
+        );
+      })
+      .catch(() => {
+        /* se falhar, o histórico ficará vazio até o WS popular */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [printerId]);
+
   useEffect(() => {
     if (detecting) return;
     const client = new WsClient(wsUrl);
     clientRef.current = client;
 
+    let lastAppend = 0;
     const off = client.onMessage((msg) => {
       if (msg.type === 'printer.state' && msg.payload.printerId === printerId) {
         setState(msg.payload);
-        setHistory((h) =>
-          [
-            ...h,
-            {
-              t: Date.now(),
-              nozzle: msg.payload.nozzleTemp,
-              bed: msg.payload.bedTemp,
-            },
-          ].slice(-120),
-        );
+        // Appenda 1 ponto/min no histórico local — alinhado com o
+        // throttle do backend. Drops pontos > 24h atrás.
+        const now = Date.now();
+        if (now - lastAppend >= 60_000) {
+          lastAppend = now;
+          setHistory((h) => {
+            const cutoff = now - TEMP_WINDOW_HOURS * 3_600_000;
+            return [
+              ...h.filter((p) => p.t > cutoff),
+              {
+                t: now,
+                nozzle: msg.payload.nozzleTemp,
+                bed: msg.payload.bedTemp,
+                chamber: msg.payload.chamberTemp,
+              },
+            ];
+          });
+        }
       } else if (msg.type === 'printer.event' && msg.payload.printerId === printerId) {
         pushEvent(msg.payload);
         setEvents((e) => [msg.payload, ...e].slice(0, 30));
@@ -102,7 +143,11 @@ export function PrinterDetailClient({ printerId, name }: Props) {
   }
 
   const chartData = useMemo(
-    () => history.map((h) => ({ ...h, t: new Date(h.t).toLocaleTimeString() })),
+    () =>
+      history.map((h) => ({
+        ...h,
+        t: new Date(h.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      })),
     [history],
   );
 
@@ -329,7 +374,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
       {/* Chart */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Temperaturas (últimos minutos)</CardTitle>
+          <CardTitle className="text-base">Temperaturas — últimas 24h</CardTitle>
         </CardHeader>
         <CardContent className="h-56">
           <ResponsiveContainer width="100%" height="100%">
@@ -361,6 +406,15 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 dot={false}
                 isAnimationActive={false}
                 name="Mesa"
+              />
+              <Line
+                type="monotone"
+                dataKey="chamber"
+                stroke="#a78bfa"
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                name="Câmara"
               />
             </LineChart>
           </ResponsiveContainer>
