@@ -37,8 +37,7 @@ import { SpeedModeIndicator } from '@/components/speed-mode-indicator';
 import { WifiIndicator } from '@/components/wifi-indicator';
 import { FansDisplay } from '@/components/fans-display';
 import { StatRow } from '@/components/stat-row';
-import { ThumbnailPreview } from '@/components/thumbnail-preview';
-import { LayerView } from '@/components/layer-view';
+import { PrintPreview } from '@/components/print-preview';
 import { formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -234,7 +233,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           </CardHeader>
           <CardContent className="space-y-3 pb-3">
             <div className="grid grid-cols-[7.5rem_1fr] gap-3 items-start">
-              <LayerView
+              <PrintPreview
                 printerId={printerId}
                 cacheKey={state?.currentFile ?? null}
                 currentLayer={state?.currentLayer ?? null}
