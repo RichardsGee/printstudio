@@ -40,12 +40,21 @@ interface Props {
   className?: string;
 }
 
-// Projeção top-down 2D: world (x, y) → screen (sx, sy). Flip Y pra
-// alinhar com SVG (origem no topo-esquerda). Muito mais leve que
-// isométrico — todas as camadas compartilham o mesmo plano XY e só
-// a ordem de desenho define o "empilhamento" visual.
+// Projeção top-down 2D por camada — cada camada é um SVG 2D e o
+// empilhamento 3D é feito via CSS `transform: translateZ()` + GPU.
 function project(x: number, y: number): [number, number] {
   return [x, -y];
+}
+
+// Z projetado em pixels — adaptativo ao extent XY pra que prints
+// curtos (ex. chaveiro 2mm) ainda pareçam 3D, e prints altos não
+// estourem a tela.
+function adaptiveZScalePx(xRange: number, yRange: number, zMax: number): number {
+  if (zMax <= 0.01) return 1;
+  const xyExtent = Math.max(xRange, yRange);
+  // Queremos que a altura empilhada represente ~35% do extent XY.
+  const targetPx = xyExtent * 0.35;
+  return Math.max(1, Math.min(targetPx / zMax, 25));
 }
 
 function normalizeHex(c: string | null | undefined): string {
@@ -321,10 +330,11 @@ function FilamentLegend({ metadata }: { metadata?: LayersMetadata }) {
 }
 
 /**
- * SVG isométrico das camadas. Cada polilinha é desenhada na cor
- * do seu tool (filamento) conforme indicado pelo gcode. A camada
- * ativa destaca-se com glow branco; camadas já impressas aparecem
- * em tom sólido reduzido; futuras ficam como silhueta fantasma.
+ * Renderiza cada camada como um SVG 2D separado e usa CSS 3D
+ * transforms (`preserve-3d` + `translateZ`) pra empilhar em altura
+ * real — o GPU faz todo o trabalho de composição 3D. Fica tão
+ * leve quanto a versão 2D mas com efeito tridimensional de verdade,
+ * escalável pra centenas de camadas sem travar.
  */
 function LayerSvg({
   data,
@@ -339,17 +349,14 @@ function LayerSvg({
   fallbackColor: string;
   idSuffix: string;
 }) {
-  const groupsRef = useRef<SVGGElement[]>([]);
+  const layersRef = useRef<HTMLDivElement[]>([]);
 
-  const { layerSvgs, bounds } = useMemo(() => {
+  const { layerSvgs, bounds, zScalePx } = useMemo(() => {
     let minSX = Number.POSITIVE_INFINITY;
     let maxSX = Number.NEGATIVE_INFINITY;
     let minSY = Number.POSITIVE_INFINITY;
     let maxSY = Number.NEGATIVE_INFINITY;
 
-    // Por camada, concatena TODAS as polilinhas do mesmo tool num único
-    // atributo `d` (ex: "M1,2 L3,4 M5,6 L7,8") — gera 1 elemento <path>
-    // por combinação (layer × tool) em vez de um por polilinha.
     const layerSvgs = data.layers.map((layer) => {
       const byTool = new Map<number, string>();
       for (const poly of layer.paths) {
@@ -372,7 +379,10 @@ function LayerSvg({
         const existing = byTool.get(poly.tool);
         byTool.set(poly.tool, existing ? `${existing} ${segment}` : segment);
       }
-      return Array.from(byTool.entries()).map(([tool, d]) => ({ tool, d }));
+      return {
+        z: layer.z,
+        tools: Array.from(byTool.entries()).map(([tool, d]) => ({ tool, d })),
+      };
     });
 
     if (!Number.isFinite(minSX)) {
@@ -381,29 +391,43 @@ function LayerSvg({
       minSY = 0;
       maxSY = 0;
     }
-    return { layerSvgs, bounds: { minX: minSX, maxX: maxSX, minY: minSY, maxY: maxSY } };
+
+    const xRange = maxSX - minSX;
+    const yRange = maxSY - minSY;
+    const zMax = data.layers.length > 0 ? data.layers[data.layers.length - 1].z : 0;
+    const zScalePx = adaptiveZScalePx(xRange, yRange, zMax);
+
+    return {
+      layerSvgs,
+      bounds: { minX: minSX, maxX: maxSX, minY: minSY, maxY: maxSY },
+      zScalePx,
+    };
   }, [data]);
 
+  // Visibilidade/estilo por camada — classe muda via DOM sem re-render.
   useEffect(() => {
-    const groups = groupsRef.current;
-    if (!groups.length) return;
+    const elems = layersRef.current;
+    if (!elems.length) return;
     const active = currentLayer && currentLayer > 0;
-    const idx = active ? Math.min(currentLayer - 1, groups.length - 1) : -1;
-    for (let i = 0; i < groups.length; i++) {
-      const g = groups[i];
-      if (!g) continue;
-      if (!active) g.setAttribute('class', `lyr-preview-${idSuffix}`);
-      else if (i < idx) g.setAttribute('class', `lyr-done-${idSuffix}`);
-      else if (i === idx) g.setAttribute('class', `lyr-active-${idSuffix}`);
-      else g.setAttribute('class', `lyr-future-${idSuffix}`);
+    const idx = active ? Math.min(currentLayer - 1, elems.length - 1) : -1;
+    for (let i = 0; i < elems.length; i++) {
+      const el = elems[i];
+      if (!el) continue;
+      if (!active) el.setAttribute('class', `lyr-preview-${idSuffix} lyr-base`);
+      else if (i < idx) el.setAttribute('class', `lyr-done-${idSuffix} lyr-base`);
+      else if (i === idx) el.setAttribute('class', `lyr-active-${idSuffix} lyr-base`);
+      else el.setAttribute('class', `lyr-future-${idSuffix} lyr-base`);
     }
   }, [currentLayer, data, idSuffix]);
 
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
   const pad = Math.max(width, height) * 0.06;
+  const vbX = bounds.minX - pad;
+  const vbY = bounds.minY - pad;
+  const vbW = width + pad * 2;
+  const vbH = height + pad * 2;
 
-  // Resolve cor por tool — usa metadata se tiver, senão fallback.
   const colorFor = (tool: number): string => {
     const raw = toolColors[tool];
     if (raw) return ensureContrast(raw, 0.5);
@@ -411,50 +435,74 @@ function LayerSvg({
   };
 
   return (
-    <svg
-      viewBox={`${bounds.minX - pad} ${bounds.minY - pad} ${width + pad * 2} ${height + pad * 2}`}
-      preserveAspectRatio="xMidYMid meet"
-      className="absolute inset-0 h-full w-full"
+    <div
+      className="absolute inset-0"
+      style={{
+        perspective: '1600px',
+        perspectiveOrigin: '50% 60%',
+        background: 'radial-gradient(ellipse at 50% 55%, hsl(220 40% 10%) 0%, hsl(220 55% 3%) 75%)',
+      }}
     >
-      <defs>
-        <radialGradient id={`bg-${idSuffix}`} cx="50%" cy="50%" r="70%">
-          <stop offset="0%" stopColor="hsl(220 40% 9%)" />
-          <stop offset="100%" stopColor="hsl(220 55% 3%)" />
-        </radialGradient>
-        <style>{`
-          /* DONE — sólido reduzido na cor do tool */
-          .lyr-done-${idSuffix} path { stroke-width: 0.22; stroke-opacity: 0.82; fill: none; stroke-linejoin: round; stroke-linecap: round; }
-          /* ACTIVE — branco quente com glow do tool */
-          .lyr-active-${idSuffix} path { stroke: #ffffff; stroke-width: 0.48; stroke-opacity: 1; fill: none; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 1.5px currentColor); }
-          /* FUTURE — fantasma neutro pra manter a silhueta */
-          .lyr-future-${idSuffix} path { stroke: hsl(220 20% 50%); stroke-width: 0.14; stroke-opacity: 0.12; fill: none; stroke-linejoin: round; }
-          /* PREVIEW — quando ocioso, cor do tool meio-termo */
-          .lyr-preview-${idSuffix} path { stroke-width: 0.18; stroke-opacity: 0.42; fill: none; stroke-linejoin: round; stroke-linecap: round; }
-        `}</style>
-      </defs>
+      <style>{`
+        .lyr-base {
+          position: absolute;
+          inset: 0;
+          transform-style: preserve-3d;
+          pointer-events: none;
+          transition: opacity 300ms ease;
+        }
+        .lyr-done-${idSuffix} { opacity: 0.88; }
+        .lyr-active-${idSuffix} { opacity: 1; }
+        .lyr-future-${idSuffix} { opacity: 0.12; }
+        .lyr-preview-${idSuffix} { opacity: 0.6; }
+        .lyr-active-${idSuffix} svg path { filter: drop-shadow(0 0 0.6px currentColor); }
+      `}</style>
 
-      <rect
-        x={bounds.minX - pad}
-        y={bounds.minY - pad}
-        width={width + pad * 2}
-        height={height + pad * 2}
-        fill={`url(#bg-${idSuffix})`}
-      />
-
-      {layerSvgs.map((toolGroups, i) => (
-        <g
-          key={i}
-          ref={(el) => {
-            if (el) groupsRef.current[i] = el;
-          }}
-          className={`lyr-future-${idSuffix}`}
-        >
-          {toolGroups.map(({ tool, d }) => {
-            const c = colorFor(tool);
-            return <path key={tool} d={d} stroke={c} style={{ color: c }} />;
-          })}
-        </g>
-      ))}
-    </svg>
+      <div
+        className="absolute inset-0"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: 'rotateX(62deg) rotateZ(-18deg)',
+        }}
+      >
+        {layerSvgs.map((layer, i) => {
+          const isActive = !!(currentLayer && currentLayer > 0 && i === currentLayer - 1);
+          return (
+            <div
+              key={i}
+              ref={(el) => {
+                if (el) layersRef.current[i] = el;
+              }}
+              className={`lyr-base lyr-future-${idSuffix}`}
+              style={{
+                transform: `translateZ(${(layer.z * zScalePx).toFixed(1)}px)`,
+              }}
+            >
+              <svg
+                viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+                preserveAspectRatio="xMidYMid meet"
+                className="absolute inset-0 h-full w-full"
+              >
+                {layer.tools.map(({ tool, d }) => {
+                  const c = colorFor(tool);
+                  return (
+                    <path
+                      key={tool}
+                      d={d}
+                      stroke={isActive ? '#ffffff' : c}
+                      strokeWidth={isActive ? 0.45 : 0.22}
+                      fill="none"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      style={{ color: c }}
+                    />
+                  );
+                })}
+              </svg>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
