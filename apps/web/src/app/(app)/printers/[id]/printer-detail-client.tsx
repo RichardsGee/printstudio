@@ -249,8 +249,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Impressão atual</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 pb-3">
-            <div className="grid grid-cols-[7.5rem_1fr] gap-3 items-start">
+          <CardContent className="pb-3 space-y-3">
+            {/* Linha superior: preview + arquivo + filamento */}
+            <div className="grid grid-cols-[10rem_1fr] gap-3 items-center">
               <PrintPreview
                 printerId={printerId}
                 cacheKey={state?.currentFile ?? null}
@@ -258,59 +259,63 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 totalLayers={state?.totalLayers ?? null}
                 filamentColor={activeSlot?.color ?? null}
               />
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <FileText className="h-3 w-3" />
-                  <span>arquivo</span>
-                </div>
-                <div className="text-xs font-medium truncate">
-                  {state?.currentFile ?? '—'}
-                </div>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <FilamentSwatch
-                    color={activeSlot?.color ?? null}
-                    active={!!activeSlot}
-                    size="sm"
-                  />
-                  <div className="text-[11px] text-muted-foreground min-w-0 truncate">
-                    {activeSlot
-                      ? `${activeSlot.filamentType ?? 'Filamento'}${
-                          activeSlot.slot !== undefined ? ` — slot ${activeSlot.slot + 1}` : ''
-                        }`
-                      : 'sem filamento ativo'}
+
+              <div className="min-w-0 space-y-2">
+                <div>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Arquivo
+                  </div>
+                  <div className="text-sm font-medium truncate" title={state?.currentFile ?? ''}>
+                    {state?.currentFile ?? '—'}
                   </div>
                 </div>
-                <div className="mt-2">
-                  <div className="flex items-baseline justify-between mb-0.5">
-                    <span className="text-2xl font-semibold tabular-nums leading-none">
-                      {progress.toFixed(1)}
-                      <span className="text-sm text-muted-foreground ml-0.5">%</span>
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      c. {state?.currentLayer ?? '—'}/{state?.totalLayers ?? '—'}
-                    </span>
+
+                {activeSlot ? (
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                      Filamento
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <FilamentSwatch color={activeSlot.color ?? null} active size="sm" />
+                      <span className="text-xs truncate">
+                        {activeSlot.filamentType ?? 'Filamento'} — slot {activeSlot.slot + 1}
+                      </span>
+                    </div>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-                    />
-                  </div>
-                </div>
+                ) : null}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 pt-1 border-t border-border/40">
-              <StatRow
-                icon={Clock}
-                label="Termina às"
-                value={formatEtaClock(state?.remainingSec)}
-              />
-              <StatRow
-                icon={Clock}
-                label="Restante"
-                value={formatDuration(state?.remainingSec)}
-                tone="muted"
+            {/* Barra de progresso grande */}
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold tabular-nums leading-none">
+                    {progress.toFixed(1)}
+                  </span>
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+                <span className="text-xs font-mono text-muted-foreground">
+                  Camada {state?.currentLayer ?? '—'}/{state?.totalLayers ?? '—'}
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Footer: ETA + restante + velocidade, alinhado em grid regular */}
+            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/40 text-xs">
+              <InfoPill label="Termina às" value={formatEtaClock(state?.remainingSec)} />
+              <InfoPill label="Restante" value={formatDuration(state?.remainingSec)} />
+              <InfoPill
+                label="Velocidade"
+                value={
+                  state?.speedPercent != null ? `${Math.round(state.speedPercent)}%` : '—'
+                }
               />
             </div>
           </CardContent>
@@ -452,6 +457,17 @@ export function PrinterDetailClient({ printerId, name }: Props) {
         </CardContent>
       </Card>
       </div>
+    </div>
+  );
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 flex flex-col">
+      <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <span className="text-sm font-medium tabular-nums">{value}</span>
     </div>
   );
 }
