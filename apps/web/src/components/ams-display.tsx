@@ -1,4 +1,5 @@
-import type { AmsSlot } from '@printstudio/shared';
+import type { AmsSlot, AmsUnit } from '@printstudio/shared';
+import { Droplets, Thermometer } from 'lucide-react';
 import { Spool } from './spool';
 import { cn } from '@/lib/utils';
 
@@ -8,9 +9,11 @@ import { cn } from '@/lib/utils';
  */
 export function AmsDisplay({
   slots,
+  units = [],
   bare = false,
 }: {
   slots: AmsSlot[];
+  units?: AmsUnit[];
   /** Quando `true`, omite o card externo — útil pra embeddar dentro de outra carteira. */
   bare?: boolean;
 }) {
@@ -18,16 +21,72 @@ export function AmsDisplay({
     (i) => slots.find((s) => s.slot === i) ?? null,
   );
 
-  const grid = (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {normalized.map((slot, i) => (
-        <SlotCell key={i} slot={slot} index={i} />
-      ))}
+  const unit = units[0] ?? null;
+
+  const body = (
+    <div className="space-y-2">
+      {unit && (unit.humidityLevel !== null || unit.tempC !== null) ? (
+        <AmsUnitBar unit={unit} />
+      ) : null}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {normalized.map((slot, i) => (
+          <SlotCell key={i} slot={slot} index={i} />
+        ))}
+      </div>
     </div>
   );
 
-  if (bare) return grid;
-  return <div className="rounded-xl border border-border/60 bg-card p-3">{grid}</div>;
+  if (bare) return body;
+  return <div className="rounded-xl border border-border/60 bg-card p-3">{body}</div>;
+}
+
+function AmsUnitBar({ unit }: { unit: AmsUnit }) {
+  const level = unit.humidityLevel;
+  const humidityLabel =
+    level === null
+      ? '—'
+      : level <= 2
+        ? 'Seco'
+        : level === 3
+          ? 'OK'
+          : level === 4
+            ? 'Úmido'
+            : 'Muito úmido';
+  const humidityTone =
+    level === null
+      ? 'text-muted-foreground'
+      : level <= 2
+        ? 'text-emerald-400'
+        : level === 3
+          ? 'text-amber-400'
+          : 'text-red-400';
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-2 py-1 rounded-md bg-muted/30 text-[11px]">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1.5">
+          <Droplets className={cn('h-3.5 w-3.5', humidityTone)} />
+          <span className="text-muted-foreground">Humidade</span>
+          <span className={cn('font-medium', humidityTone)}>
+            {humidityLabel}
+            {unit.humidityPct !== null ? ` (~${unit.humidityPct}%)` : ''}
+          </span>
+        </div>
+        {unit.tempC !== null ? (
+          <div className="flex items-center gap-1.5">
+            <Thermometer className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Temp AMS</span>
+            <span className="font-medium tabular-nums">{unit.tempC.toFixed(1)}°C</span>
+          </div>
+        ) : null}
+      </div>
+      {level !== null && level >= 4 ? (
+        <span className="text-[10px] font-mono uppercase text-red-400">
+          ⚠ Secar filamento
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function SlotCell({ slot, index }: { slot: AmsSlot | null; index: number }) {

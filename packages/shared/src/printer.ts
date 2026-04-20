@@ -21,6 +21,22 @@ export const AmsSlotSchema = z.object({
 });
 export type AmsSlot = z.infer<typeof AmsSlotSchema>;
 
+/**
+ * Unidade AMS (chassi físico). Bambu reporta humidade como um
+ * inteiro 1..5 onde 1 = muito seco, 5 = muito úmido. Vamos expor
+ * também uma aproximação em % pra UX.
+ */
+export const AmsUnitSchema = z.object({
+  id: z.number().int().nullable(),
+  /** Código 1..5 retornado pela Bambu; null quando não houver leitura. */
+  humidityLevel: z.number().int().min(1).max(5).nullable(),
+  /** % aproximada (1→20%, 2→35%, 3→50%, 4→65%, 5→80%) para display. */
+  humidityPct: z.number().nullable(),
+  /** Temperatura interna do AMS em °C. */
+  tempC: z.number().nullable(),
+});
+export type AmsUnit = z.infer<typeof AmsUnitSchema>;
+
 export const SpeedModeSchema = z.enum(['silent', 'standard', 'sport', 'ludicrous']);
 export type SpeedMode = z.infer<typeof SpeedModeSchema>;
 
@@ -46,6 +62,7 @@ export const PrinterStateSchema = z.object({
   currentFile: z.string().nullable(),
   hmsErrors: z.array(HmsErrorSchema),
   amsSlots: z.array(AmsSlotSchema),
+  amsUnits: z.array(AmsUnitSchema),
   activeSlotIndex: z.number().int().nullable(),          // index of the tray currently feeding
   speedMode: SpeedModeSchema.nullable(),                 // silent | standard | sport | ludicrous
   speedPercent: z.number().nullable(),                   // spd_mag (%)

@@ -60,6 +60,7 @@ export const printerState = pgTable('printer_state', {
   currentFile: text('current_file'),
   hmsErrors: jsonb('hms_errors').$type<Array<{ code: string; severity: string; message?: string }>>().default([]),
   amsState: jsonb('ams_state').$type<Array<{ slot: number; filamentType: string | null; color: string | null; remainingPct: number | null; active: boolean }>>().default([]),
+  amsUnits: jsonb('ams_units').$type<Array<{ id: number | null; humidityLevel: number | null; humidityPct: number | null; tempC: number | null }>>().default([]),
   activeSlotIndex: integer('active_slot_index'),
   speedMode: text('speed_mode'),
   speedPercent: numeric('speed_percent', { precision: 5, scale: 1 }),

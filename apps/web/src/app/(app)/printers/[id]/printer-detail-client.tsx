@@ -202,7 +202,11 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             </div>
           </div>
           <div className="p-2.5">
-            <AmsDisplay slots={state?.amsSlots ?? []} bare />
+            <AmsDisplay
+              slots={state?.amsSlots ?? []}
+              units={state?.amsUnits ?? []}
+              bare
+            />
           </div>
         </div>
       </div>

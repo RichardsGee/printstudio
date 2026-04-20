@@ -1,0 +1,1 @@
+ALTER TABLE "printer_state" ADD COLUMN "ams_units" jsonb DEFAULT '[]'::jsonb;

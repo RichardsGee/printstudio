@@ -4,7 +4,7 @@
  * Reference: https://github.com/Doridian/OpenBambuAPI/blob/main/mqtt.md
  */
 
-import type { PrinterState, PrinterStatus, AmsSlot, HmsError, SpeedMode } from '@printstudio/shared';
+import type { PrinterState, PrinterStatus, AmsSlot, AmsUnit, HmsError, SpeedMode } from '@printstudio/shared';
 import type { BambuReport, BambuHmsItem, BambuAms } from './types.js';
 
 const GCODE_STATE_MAP: Record<string, PrinterStatus> = {
@@ -33,6 +33,29 @@ export function parseHmsError(item: BambuHmsItem): HmsError | null {
     severityBits >= 0xc ? 'fatal' : severityBits >= 0x8 ? 'error' : severityBits >= 0x4 ? 'warning' : 'info';
   const code = `HMS_${item.attr.toString(16).toUpperCase()}_${item.code.toString(16).toUpperCase()}`;
   return { code, severity };
+}
+
+/**
+ * Extrai uma linha por unidade AMS conectada, com humidade + temp.
+ * Bambu reporta `humidity` como string "1".."5" (1 seco, 5 úmido).
+ */
+export function parseAmsUnits(ams?: BambuAms): AmsUnit[] {
+  if (!ams?.ams || ams.ams.length === 0) return [];
+  // 1..5 → ~20/35/50/65/80 % pra ter uma sensação na UI.
+  const LEVEL_TO_PCT: Record<number, number> = { 1: 20, 2: 35, 3: 50, 4: 65, 5: 80 };
+  return ams.ams.map((u) => {
+    const idNum = u.id !== undefined ? Number(u.id) : NaN;
+    const hum = u.humidity !== undefined ? Number(u.humidity) : NaN;
+    const t = u.temp !== undefined ? Number(u.temp) : NaN;
+    const humidityLevel =
+      Number.isFinite(hum) && hum >= 1 && hum <= 5 ? (hum as 1 | 2 | 3 | 4 | 5) : null;
+    return {
+      id: Number.isFinite(idNum) ? idNum : null,
+      humidityLevel,
+      humidityPct: humidityLevel ? LEVEL_TO_PCT[humidityLevel] : null,
+      tempC: Number.isFinite(t) ? t : null,
+    };
+  });
 }
 
 export function parseAmsSlots(ams?: BambuAms): AmsSlot[] {
@@ -201,6 +224,8 @@ export function applyReport(
     // actually carries a non-empty tray list — otherwise keep what we have.
     amsSlots:
       print.ams?.ams && print.ams.ams.length > 0 ? parseAmsSlots(print.ams) : previous.amsSlots,
+    amsUnits:
+      print.ams?.ams && print.ams.ams.length > 0 ? parseAmsUnits(print.ams) : previous.amsUnits,
     activeSlotIndex:
       print.ams?.tray_now !== undefined || print.ams?.tray_tar !== undefined
         ? parseActiveSlot(print.ams) ?? previous.activeSlotIndex
@@ -236,6 +261,7 @@ export function emptyState(printerId: string): PrinterState {
     currentFile: null,
     hmsErrors: [],
     amsSlots: [],
+    amsUnits: [],
     activeSlotIndex: null,
     speedMode: null,
     speedPercent: null,
