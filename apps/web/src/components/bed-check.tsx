@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Eye, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye, Loader2, Camera } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -12,8 +13,11 @@ const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
 interface BedCheckResult {
   hasPlate: boolean;
   confidence: 'high' | 'medium' | 'low';
+  similarityWithPlate: number | null;
+  similarityNoPlate: number | null;
   edgeDensity: number;
   threshold: number;
+  mode: 'baseline' | 'heuristic';
   previewBase64: string;
   capturedAt: number;
 }
@@ -25,7 +29,7 @@ const CONF_LABEL: Record<BedCheckResult['confidence'], string> = {
 };
 
 export function BedCheckCard({ printerId }: { printerId: string }) {
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'calibrating' | 'ok' | 'error'>('idle');
   const [result, setResult] = useState<BedCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,26 +53,75 @@ export function BedCheckCard({ printerId }: { printerId: string }) {
     }
   };
 
+  const calibrate = async (type: 'with' | 'no'): Promise<void> => {
+    setStatus('calibrating');
+    try {
+      const res = await fetch(
+        `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/bed-check/calibrate?type=${type}`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      toast.success(
+        type === 'with'
+          ? 'Baseline "com chapa" salvo'
+          : 'Baseline "sem chapa" salvo',
+      );
+      setStatus('idle');
+    } catch (err) {
+      toast.error('Calibração falhou: ' + (err instanceof Error ? err.message : 'erro'));
+      setStatus('idle');
+    }
+  };
+
+  const busy = status === 'loading' || status === 'calibrating';
+
   return (
     <Card>
-      <CardHeader className="pb-2 flex-row items-center justify-between">
+      <CardHeader className="pb-2 flex-row items-center justify-between flex-wrap gap-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Eye className="h-4 w-4" />
           Verificação da mesa
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={run} disabled={status === 'loading'}>
-          {status === 'loading' ? (
-            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-          ) : null}
-          Verificar chapa
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="ghost" onClick={() => calibrate('with')} disabled={busy}>
+            <Camera className="h-3.5 w-3.5 mr-1.5" />
+            Calibrar: com chapa
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => calibrate('no')} disabled={busy}>
+            <Camera className="h-3.5 w-3.5 mr-1.5" />
+            Calibrar: sem chapa
+          </Button>
+          <Button size="sm" variant="outline" onClick={run} disabled={busy}>
+            {status === 'loading' ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : null}
+            Verificar
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="pb-3">
         {status === 'idle' ? (
-          <p className="text-xs text-muted-foreground">
-            Análise visual da chapa magnética antes de iniciar uma impressão. Captura um
-            frame da câmera e verifica se há chapa na mesa.
-          </p>
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>
+              <strong className="text-foreground">Primeiro uso:</strong> posicione a mesa com a
+              chapa e clique em <strong>Calibrar: com chapa</strong>. Depois remova a chapa e
+              clique em <strong>Calibrar: sem chapa</strong>.
+            </p>
+            <p>
+              Com os dois baselines, a detecção compara cada frame atual com as referências —
+              muito mais preciso que edge-density puro.
+            </p>
+          </div>
+        ) : null}
+
+        {status === 'calibrating' ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Capturando baseline…
+          </div>
         ) : null}
 
         {status === 'error' ? (
@@ -77,7 +130,6 @@ export function BedCheckCard({ printerId }: { printerId: string }) {
 
         {status === 'ok' && result ? (
           <div className="grid gap-3 md:grid-cols-[1fr_auto] items-center">
-            {/* Preview */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`data:image/jpeg;base64,${result.previewBase64}`}
@@ -104,21 +156,27 @@ export function BedCheckCard({ printerId }: { printerId: string }) {
                     {result.hasPlate ? 'Chapa detectada' : 'Chapa não detectada'}
                   </div>
                   <div className="text-[11px] opacity-80">
-                    Confiança: {CONF_LABEL[result.confidence]}
+                    Modo: {result.mode === 'baseline' ? 'comparação' : 'heurística'} • Confiança:{' '}
+                    {CONF_LABEL[result.confidence]}
                   </div>
                 </div>
               </div>
 
               <div className="text-[11px] text-muted-foreground font-mono space-y-0.5">
+                {result.similarityWithPlate !== null ? (
+                  <div>
+                    Sim. c/ chapa: {(result.similarityWithPlate * 100).toFixed(1)}%
+                  </div>
+                ) : null}
+                {result.similarityNoPlate !== null ? (
+                  <div>
+                    Sim. s/ chapa: {(result.similarityNoPlate * 100).toFixed(1)}%
+                  </div>
+                ) : null}
                 <div>
                   Edge density: {(result.edgeDensity * 100).toFixed(2)}%
                 </div>
-                <div>
-                  Limiar: {(result.threshold * 100).toFixed(2)}%
-                </div>
-                <div>
-                  {new Date(result.capturedAt).toLocaleTimeString('pt-BR')}
-                </div>
+                <div>{new Date(result.capturedAt).toLocaleTimeString('pt-BR')}</div>
               </div>
             </div>
           </div>

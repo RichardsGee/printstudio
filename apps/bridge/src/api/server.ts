@@ -15,7 +15,8 @@ import type { CameraManager } from '../camera/manager.js';
 import type { ThumbnailManager } from '../ftp/thumbnail-manager.js';
 import type { LayersManager } from '../gcode/layers-manager.js';
 import type { Logger } from '../logger.js';
-import { analyzeBedFrame, captureFreshFrame } from '../camera/bed-check.js';
+import { analyzeBedFrame, captureFreshFrame, BedCheckStore } from '../camera/bed-check.js';
+import { resolve } from 'node:path';
 
 interface ServerOpts {
   manager: MqttManager;
@@ -62,15 +63,19 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
     },
   );
 
+  const bedStore = new BedCheckStore(resolve(process.cwd(), 'data', 'bed-check'));
+
   // Bed-check: analisa um frame da câmera e retorna se há chapa
-  // magnética detectada na mesa. Usa Sobel + edge density (sem ML).
+  // magnética detectada na mesa. Usa baselines calibradas se houver,
+  // senão cai no heurístico (edge density no ROI da mesa).
   app.get<{ Params: { id: string } }>('/api/printers/:id/bed-check', async (req, reply) => {
     const frame = await captureFreshFrame(cameras, req.params.id);
     if (!frame) {
       return reply.code(503).send({ error: 'camera unavailable' });
     }
     try {
-      const result = await analyzeBedFrame(frame);
+      const baselines = await bedStore.loadBaselines(req.params.id);
+      const result = await analyzeBedFrame(frame, baselines);
       reply.header('Access-Control-Allow-Origin', '*').send(result);
       return reply;
     } catch (err) {
@@ -81,6 +86,35 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
       return reply.code(500).send({ error: 'analysis failed' });
     }
   });
+
+  // Calibração: captura frame atual e salva como baseline pra um tipo
+  // ("with" = chapa presente; "no" = chapa removida). Requer 2 baselines
+  // pra análise comparativa precisa.
+  app.post<{ Params: { id: string }; Querystring: { type?: string } }>(
+    '/api/printers/:id/bed-check/calibrate',
+    async (req, reply) => {
+      const type = req.query.type === 'no' ? 'no' : req.query.type === 'with' ? 'with' : null;
+      if (!type) {
+        return reply
+          .code(400)
+          .send({ error: 'query param "type" must be "with" or "no"' });
+      }
+      const frame = await captureFreshFrame(cameras, req.params.id);
+      if (!frame) return reply.code(503).send({ error: 'camera unavailable' });
+      try {
+        await bedStore.saveBaseline(req.params.id, type, frame);
+        logger.info({ printerId: req.params.id, type }, 'bed-check: baseline saved');
+        reply.header('Access-Control-Allow-Origin', '*').send({ ok: true, type });
+        return reply;
+      } catch (err) {
+        logger.error(
+          { err: err instanceof Error ? err.message : err, printerId: req.params.id },
+          'bed-check calibrate failed',
+        );
+        return reply.code(500).send({ error: 'calibrate failed' });
+      }
+    },
+  );
 
   // Parsed gcode layers (compact JSON). Frontend renders as SVG animation.
   // Gzipa manualmente quando o cliente aceita — o payload de ~2MB vira
