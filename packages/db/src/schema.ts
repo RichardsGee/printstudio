@@ -8,6 +8,7 @@ import {
   inet,
   jsonb,
   bigserial,
+  boolean,
   pgEnum,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
@@ -68,9 +69,16 @@ export const printerState = pgTable('printer_state', {
   fanPartCoolingPct: integer('fan_part_cooling_pct'),
   fanAuxPct: integer('fan_aux_pct'),
   fanChamberPct: integer('fan_chamber_pct'),
+  fanHeatbreakPct: integer('fan_heatbreak_pct'),
   nozzleDiameter: text('nozzle_diameter'),
   nozzleType: text('nozzle_type'),
   stage: text('stage'),
+  doorOpen: boolean('door_open'),
+  isFromSdCard: boolean('is_from_sd_card'),
+  lifecycle: text('lifecycle'),
+  printType: text('print_type'),
+  printErrorCode: integer('print_error_code'),
+  stateChangeReason: text('state_change_reason'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

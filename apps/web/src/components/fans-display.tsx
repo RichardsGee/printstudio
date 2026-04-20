@@ -7,15 +7,21 @@ interface Props {
   part: number | null;
   aux: number | null;
   chamber: number | null;
+  heatbreak?: number | null;
   className?: string;
 }
 
-export function FansDisplay({ part, aux, chamber, className }: Props) {
+export function FansDisplay({ part, aux, chamber, heatbreak, className }: Props) {
+  // Só mostra heatbreak se vier do MQTT — evita coluna vazia.
+  const cols = heatbreak !== null && heatbreak !== undefined ? 'grid-cols-4' : 'grid-cols-3';
   return (
-    <div className={cn('grid grid-cols-3 gap-2 text-xs', className)}>
+    <div className={cn('grid gap-2 text-xs', cols, className)}>
       <FanItem label="Peça" percent={part} />
       <FanItem label="Auxiliar" percent={aux} />
       <FanItem label="Câmara" percent={chamber} />
+      {heatbreak !== null && heatbreak !== undefined ? (
+        <FanItem label="Heatbreak" percent={heatbreak} />
+      ) : null}
     </div>
   );
 }

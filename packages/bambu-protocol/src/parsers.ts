@@ -238,9 +238,27 @@ export function applyReport(
     fanAuxPct: print.big_fan1_speed !== undefined ? parseFanPct(print.big_fan1_speed) : previous.fanAuxPct,
     fanChamberPct:
       print.big_fan2_speed !== undefined ? parseFanPct(print.big_fan2_speed) : previous.fanChamberPct,
+    fanHeatbreakPct:
+      print.heatbreak_fan_speed !== undefined
+        ? parseFanPct(print.heatbreak_fan_speed)
+        : previous.fanHeatbreakPct,
     nozzleDiameter,
     nozzleType: print.nozzle_type ?? previous.nozzleType,
     stage,
+    // hw_switch_state bit 0 = door open (A1 shipped sem porta, mas o campo
+    // existe — deixamos reservado pra P1S/X1C futuros).
+    doorOpen:
+      print.hw_switch_state !== undefined ? (print.hw_switch_state & 0x1) === 1 : previous.doorOpen,
+    isFromSdCard: print.sdcard ?? previous.isFromSdCard,
+    lifecycle: print.lifecycle ?? previous.lifecycle,
+    printType: print.print_type ?? previous.printType,
+    printErrorCode:
+      print.print_error !== undefined && print.print_error !== 0
+        ? print.print_error
+        : print.print_error === 0
+          ? null
+          : previous.printErrorCode,
+    stateChangeReason: print.gcode_state_change_reason ?? previous.stateChangeReason,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -262,6 +280,13 @@ export function emptyState(printerId: string): PrinterState {
     hmsErrors: [],
     amsSlots: [],
     amsUnits: [],
+    fanHeatbreakPct: null,
+    doorOpen: null,
+    isFromSdCard: null,
+    lifecycle: null,
+    printType: null,
+    printErrorCode: null,
+    stateChangeReason: null,
     activeSlotIndex: null,
     speedMode: null,
     speedPercent: null,

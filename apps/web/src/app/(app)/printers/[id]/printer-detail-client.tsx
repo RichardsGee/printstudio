@@ -10,6 +10,8 @@ import {
   Flame,
   Wind,
   FileText,
+  DoorOpen,
+  HardDrive,
 } from 'lucide-react';
 import {
   LineChart,
@@ -165,9 +167,24 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           <h1 className="text-xl font-semibold tracking-tight flex items-center gap-3">
             {name}
             <StatusBadge status={state?.status ?? 'UNKNOWN'} />
+            {state?.doorOpen ? (
+              <span className="inline-flex items-center gap-1 text-xs font-mono rounded-md border border-amber-500/60 bg-amber-500/15 text-amber-200 px-1.5 py-0.5">
+                <DoorOpen className="h-3 w-3" />
+                PORTA ABERTA
+              </span>
+            ) : null}
+            {state?.isFromSdCard ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                <HardDrive className="h-3 w-3" />
+                SD
+              </span>
+            ) : null}
           </h1>
           {state?.stage ? (
-            <div className="text-xs text-muted-foreground mt-0.5">{state.stage}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {state.stage}
+              {state?.stateChangeReason ? ` — ${state.stateChangeReason}` : ''}
+            </div>
           ) : null}
         </div>
         <div className="flex gap-2">
@@ -336,6 +353,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 part={state?.fanPartCoolingPct ?? null}
                 aux={state?.fanAuxPct ?? null}
                 chamber={state?.fanChamberPct ?? null}
+                heatbreak={state?.fanHeatbreakPct ?? null}
               />
             </div>
 

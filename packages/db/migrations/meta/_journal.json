@@ -29,6 +29,13 @@
       "when": 1776665779784,
       "tag": "0003_condemned_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776668148979,
+      "tag": "0004_regular_turbo",
+      "breakpoints": true
     }
   ]
 }

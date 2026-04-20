@@ -61,6 +61,15 @@ export const BambuPrintReportSchema = z.object({
   heatbreak_fan_speed: z.union([z.string(), z.number()]).optional(),
   spd_lvl: z.number().optional(),
   spd_mag: z.number().optional(),
+  print_error: z.number().optional(),
+  hw_switch_state: z.number().optional(),
+  home_flag: z.number().optional(),
+  lifecycle: z.string().optional(),
+  print_type: z.string().optional(),
+  sdcard: z.boolean().optional(),
+  gcode_state_change_reason: z.string().optional(),
+  upgrade_state: z.record(z.unknown()).optional(),
+  fan_gear: z.number().optional(),
 }).passthrough();
 
 export const BambuReportSchema = z.object({

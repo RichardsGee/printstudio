@@ -70,9 +70,16 @@ export const PrinterStateSchema = z.object({
   fanPartCoolingPct: z.number().nullable(),              // cooling_fan_speed normalized 0..100
   fanAuxPct: z.number().nullable(),                      // big_fan1_speed
   fanChamberPct: z.number().nullable(),                  // big_fan2_speed
+  fanHeatbreakPct: z.number().nullable(),                // heatbreak_fan_speed
   nozzleDiameter: z.string().nullable(),                 // "0.4"
   nozzleType: z.string().nullable(),                     // "stainless_steel", "hardened_steel"
   stage: z.string().nullable(),                          // mc_print_stage human-readable
+  doorOpen: z.boolean().nullable(),                      // derivado de hw_switch_state (bit 0)
+  isFromSdCard: z.boolean().nullable(),                  // sdcard
+  lifecycle: z.string().nullable(),                      // booting / online / ready
+  printType: z.string().nullable(),                      // local | cloud | sd
+  printErrorCode: z.number().nullable(),                 // print_error code
+  stateChangeReason: z.string().nullable(),              // motivo da última transição
   updatedAt: z.string().datetime(),
 });
 export type PrinterState = z.infer<typeof PrinterStateSchema>;
