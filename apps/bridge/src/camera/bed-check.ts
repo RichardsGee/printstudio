@@ -9,10 +9,13 @@ export interface BedCheckResult {
    *  sem objetos/restos em cima. null quando não há baseline calibrado. */
   plateClean: boolean | null;
   confidence: 'high' | 'medium' | 'low';
-  /** Similaridade com baseline "com chapa" (0..1). Só disponível se houver baseline. */
+  /** Similaridade média com baseline "com chapa" (0..1). Para distinguir chapa vs sem chapa. */
   similarityWithPlate: number | null;
-  /** Similaridade com baseline "sem chapa" (0..1). Só disponível se houver baseline. */
+  /** Similaridade média com baseline "sem chapa" (0..1). */
   similarityNoPlate: number | null;
+  /** % de pixels que mudaram significativamente em relação ao baseline "com chapa" (0..1).
+   *  Sensível a objetos localizados que a similaridade média não captura. */
+  changeRatio: number | null;
   /** Edge density medido no ROI central (fallback e debug). */
   edgeDensity: number;
   threshold: number;
@@ -22,11 +25,17 @@ export interface BedCheckResult {
   capturedAt: number;
 }
 
-// Limiar de "limpeza": similaridade com o baseline "com chapa" acima disto
-// indica que a mesa está no mesmo estado do baseline (chapa limpa, sem
-// objetos). Abaixo, ALGO mudou — pode ser objeto esquecido, filamento
-// restante ou apenas iluminação diferente (por isso é heurístico).
-const CLEAN_THRESHOLD = 0.88;
+// Pixels com diferença de luma acima deste valor contam como "mudou".
+// 25 em escala 0..255 corresponde a ~10% de diferença — filtra ruído de
+// compressão JPEG e pequenas variações de iluminação, mas pega qualquer
+// objeto sólido.
+const PIXEL_CHANGE_THRESHOLD = 25;
+
+// Se mais de 4% dos pixels do ROI mudaram em relação ao baseline de
+// referência "mesa limpa", considera que algo está na mesa.
+// Com resolução 160×aproximadamente-90 no ROI cropado = ~14400 pixels,
+// 4% = 576 pixels alterados (área típica de um objeto pequeno).
+const CHANGE_RATIO_THRESHOLD = 0.04;
 
 // ROI da mesa na câmera da A1 — recorte em fração da largura × altura.
 // A câmera fica em cima inclinada pra frente, então a mesa ocupa
@@ -78,12 +87,25 @@ function computeEdgeDensity(data: Buffer, w: number, h: number): number {
 }
 
 function computeSimilarity(a: Buffer, b: Buffer): number {
-  // 1 - (diff médio absoluto) / 255. Simples, robusto a pequenas translações
-  // sobre frames estáveis da mesma câmera no mesmo ângulo.
+  // 1 - (diff médio absoluto) / 255. Ótimo pra distinguir mudanças
+  // globais (chapa vs sem chapa) — mas insensível a objetos pequenos
+  // localizados (a média dilui).
   if (a.length !== b.length) return 0;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff += Math.abs(a[i] - b[i]);
   return 1 - diff / (a.length * 255);
+}
+
+function computeChangeRatio(a: Buffer, b: Buffer): number {
+  // % de pixels que diferem por mais que PIXEL_CHANGE_THRESHOLD em luma.
+  // Sensível a objetos localizados — um objeto que ocupa 5% do frame
+  // gera changeRatio ~0.05 (vs ~0.02 de diff médio).
+  if (a.length !== b.length) return 1;
+  let changed = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (Math.abs(a[i] - b[i]) > PIXEL_CHANGE_THRESHOLD) changed++;
+  }
+  return changed / a.length;
 }
 
 export interface BedCheckBaselines {
@@ -103,28 +125,32 @@ export async function analyzeBedFrame(
   let mode: BedCheckResult['mode'] = 'heuristic';
   let simPlate: number | null = null;
   let simNo: number | null = null;
+  let changeRatio: number | null = null;
 
   if (baselines.withPlate) {
     const base = await cropAndGray(jpeg, BASELINE_SIZE);
     simPlate = computeSimilarity(base.data, baselines.withPlate);
+    changeRatio = computeChangeRatio(base.data, baselines.withPlate);
+
     if (baselines.noPlate) {
       simNo = computeSimilarity(base.data, baselines.noPlate);
       hasPlate = simPlate > simNo;
     } else {
       hasPlate = simPlate > 0.85;
     }
-    // Mesa limpa quando o frame atual bate bem com o baseline "com chapa"
-    // (que foi capturado quando a mesa estava pronta pra imprimir).
-    plateClean = hasPlate && simPlate > CLEAN_THRESHOLD;
+    // Mesa limpa = chapa presente E poucos pixels alterados vs baseline.
+    // Usa changeRatio em vez da similaridade média porque objetos
+    // pequenos/localizados só alteram uma fração dos pixels — a média
+    // não os captura.
+    plateClean = hasPlate && changeRatio < CHANGE_RATIO_THRESHOLD;
     mode = 'baseline';
   }
 
-  // Confidence: se modo baseline, usa diferença entre as similaridades.
-  // Caso heurístico, usa quão longe do limiar de edge density.
+  // Confidence: em modo baseline, ancora no changeRatio (quão longe do limiar).
   let confidence: BedCheckResult['confidence'] = 'low';
-  if (mode === 'baseline' && simPlate !== null) {
-    const margin = simNo !== null ? Math.abs(simPlate - simNo) : Math.abs(simPlate - 0.85);
-    confidence = margin > 0.08 ? 'high' : margin > 0.03 ? 'medium' : 'low';
+  if (mode === 'baseline' && changeRatio !== null) {
+    const delta = Math.abs(changeRatio - CHANGE_RATIO_THRESHOLD);
+    confidence = delta > 0.05 ? 'high' : delta > 0.02 ? 'medium' : 'low';
   } else {
     const ratio = edgeDensity / DENSITY_THRESHOLD;
     confidence = ratio >= 2 || ratio <= 0.5 ? 'high' : ratio >= 1.3 || ratio <= 0.75 ? 'medium' : 'low';
@@ -138,6 +164,7 @@ export async function analyzeBedFrame(
     confidence,
     similarityWithPlate: simPlate,
     similarityNoPlate: simNo,
+    changeRatio,
     edgeDensity,
     threshold: DENSITY_THRESHOLD,
     mode,

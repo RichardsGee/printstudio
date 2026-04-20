@@ -16,6 +16,7 @@ interface BedCheckResult {
   confidence: 'high' | 'medium' | 'low';
   similarityWithPlate: number | null;
   similarityNoPlate: number | null;
+  changeRatio: number | null;
   edgeDensity: number;
   threshold: number;
   mode: 'baseline' | 'heuristic';
@@ -154,8 +155,8 @@ export function BedCheckCard({ printerId }: { printerId: string }) {
                   okLabel="Mesa limpa"
                   failLabel="Algo detectado na mesa"
                   confidence={
-                    result.similarityWithPlate
-                      ? `${(result.similarityWithPlate * 100).toFixed(0)}% similar ao baseline`
+                    result.changeRatio !== null
+                      ? `${(result.changeRatio * 100).toFixed(1)}% de pixels alterados`
                       : undefined
                   }
                 />
@@ -168,8 +169,11 @@ export function BedCheckCard({ printerId }: { printerId: string }) {
 
               <div className="text-[10px] text-muted-foreground font-mono space-y-0.5 pt-1 border-t border-border/40">
                 <div>Modo: {result.mode === 'baseline' ? 'comparação' : 'heurística'}</div>
+                {result.changeRatio !== null ? (
+                  <div>Pixels alterados: {(result.changeRatio * 100).toFixed(2)}% (limiar 4%)</div>
+                ) : null}
                 {result.similarityWithPlate !== null ? (
-                  <div>Sim. limpa: {(result.similarityWithPlate * 100).toFixed(1)}%</div>
+                  <div>Sim. média: {(result.similarityWithPlate * 100).toFixed(1)}%</div>
                 ) : null}
                 {result.similarityNoPlate !== null ? (
                   <div>Sim. s/ chapa: {(result.similarityNoPlate * 100).toFixed(1)}%</div>
