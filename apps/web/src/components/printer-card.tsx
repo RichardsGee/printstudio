@@ -3,12 +3,11 @@
 import Link from 'next/link';
 import { ArrowUpRight, Clock, Layers, Thermometer, Flame } from 'lucide-react';
 import type { PrinterState } from '@printstudio/shared';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/status-badge';
 import { FilamentSwatch } from '@/components/filament-swatch';
 import { SpeedModeIndicator } from '@/components/speed-mode-indicator';
 import { WifiIndicator } from '@/components/wifi-indicator';
-import { ThumbnailPreview } from '@/components/thumbnail-preview';
 import { formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -26,57 +25,71 @@ export function PrinterCard({ printerId, name, state }: Props) {
       ? state.amsSlots.find((s) => s.slot === state.activeSlotIndex)
       : null);
 
+  const printing = status === 'PRINTING' || status === 'PAUSED' || status === 'PREPARE';
+
   return (
-    <Card className="relative overflow-hidden">
+    <Card className="relative overflow-hidden group">
       <Link
         href={`/printers/${printerId}`}
-        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+        className="absolute inset-0 z-10"
         aria-label={`Detalhe ${name}`}
-      >
-        <ArrowUpRight className="h-4 w-4" />
-      </Link>
+      />
 
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between pr-8 text-base">
-          <span className="truncate">{name}</span>
-          <StatusBadge status={status} />
-        </CardTitle>
-      </CardHeader>
+      {/* Hero — imagem da Bambu A1 com o estado em overlay */}
+      <div className="relative aspect-[4/3] w-full bg-gradient-to-b from-muted/40 to-background overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/bambu-a1.png"
+          alt="Bambu Lab A1"
+          className="absolute inset-0 h-full w-full object-contain object-center p-4 transition-transform duration-500 group-hover:scale-105"
+          draggable={false}
+        />
 
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-[5rem_1fr] gap-3 items-start">
-          <ThumbnailPreview
-            printerId={printerId}
-            cacheKey={state?.currentFile ?? null}
-          />
-          <div className="min-w-0 space-y-1">
-            <div className="text-sm font-medium truncate">
-              {state?.currentFile ?? 'Sem impressão'}
+        {/* Status + nome no topo */}
+        <div className="absolute inset-x-0 top-0 p-3 flex items-start justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+              Bambu Lab A1
             </div>
-            <div className="flex items-center gap-1.5">
-              <FilamentSwatch color={activeSlot?.color ?? null} active={!!activeSlot} size="sm" />
-              <span className="text-xs text-muted-foreground truncate">
-                {state?.stage ?? (activeSlot?.filamentType ?? 'aguardando')}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-1 pt-1">
-              <span className="text-2xl font-semibold tabular-nums">
+            <div className="text-sm font-semibold truncate">{name}</div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <StatusBadge status={status} />
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </div>
+        </div>
+
+        {/* Progresso grande quando imprimindo */}
+        {printing ? (
+          <div className="absolute bottom-3 left-3 right-3">
+            <div className="flex items-baseline gap-1.5 mb-1.5">
+              <span className="text-3xl font-semibold tabular-nums leading-none">
                 {progress.toFixed(0)}
               </span>
               <span className="text-sm text-muted-foreground">%</span>
+              <span className="ml-auto text-[11px] text-muted-foreground truncate max-w-[55%]">
+                {state?.currentFile ?? '—'}
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-background/60 backdrop-blur-sm overflow-hidden border border-border/40">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+              />
             </div>
           </div>
-        </div>
-
-        <div>
-          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-            />
+        ) : (
+          <div className="absolute bottom-3 left-3 right-3 flex items-center gap-1.5">
+            <FilamentSwatch color={activeSlot?.color ?? null} active={!!activeSlot} size="sm" />
+            <span className="text-xs text-muted-foreground truncate">
+              {state?.stage ?? (activeSlot?.filamentType ?? 'ociosa')}
+            </span>
           </div>
-        </div>
+        )}
+      </div>
 
+      {/* Stats */}
+      <CardContent className="space-y-3 pt-4">
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
           <InfoRow
             icon={Clock}

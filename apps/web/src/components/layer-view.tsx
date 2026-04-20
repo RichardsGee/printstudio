@@ -83,11 +83,15 @@ export function LayerView({ printerId, cacheKey, currentLayer, totalLayers, clas
   useEffect(() => {
     const groups = layerGroupsRef.current;
     if (!groups.length) return;
-    const idx = Math.max(0, Math.min((currentLayer ?? 0) - 1, groups.length - 1));
+    // `currentLayer` vem 1-indexed do Bambu. Se não tem impressão ativa
+    // (null ou 0), mostra o modelo inteiro em preview, sem camada ativa.
+    const active = currentLayer && currentLayer > 0;
+    const idx = active ? Math.min(currentLayer - 1, groups.length - 1) : -1;
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
       if (!g) continue;
-      if (i < idx) g.setAttribute('class', 'layer-done');
+      if (!active) g.setAttribute('class', 'layer-preview');
+      else if (i < idx) g.setAttribute('class', 'layer-done');
       else if (i === idx) g.setAttribute('class', 'layer-active');
       else g.setAttribute('class', 'layer-future');
     }
@@ -113,6 +117,7 @@ export function LayerView({ printerId, cacheKey, currentLayer, totalLayers, clas
                 .layer-done path { stroke: hsl(217 70% 45% / 0.45); stroke-width: 0.25; fill: none; }
                 .layer-active path { stroke: hsl(142 80% 55%); stroke-width: 0.5; fill: none; filter: drop-shadow(0 0 1px hsl(142 80% 55%)); }
                 .layer-future { display: none; }
+                .layer-preview path { stroke: hsl(217 50% 55% / 0.3); stroke-width: 0.25; fill: none; }
               `}</style>
             </defs>
             {pathsByLayer.map((paths, i) => (
