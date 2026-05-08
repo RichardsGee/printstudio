@@ -39,11 +39,18 @@ export function KioskStatusBanner({ printers, states }: Props) {
 
   return (
     <div
+      data-mc-banner
       className={cn(
         'flex items-center justify-between gap-4 rounded-2xl border-2 px-5 py-3',
         BANNER_TONE[tone],
       )}
     >
+      <div
+        data-mc-id
+        className="absolute -top-2 left-3 px-2 text-[10px] uppercase tracking-widest text-[var(--mc-accent)] bg-[var(--mc-bg)]"
+      >
+        ◢ MISSION CONTROL · STATION TEL-RJ-01
+      </div>
       <div className="flex items-center gap-3 min-w-0">
         {hasError ? (
           <AlertTriangle

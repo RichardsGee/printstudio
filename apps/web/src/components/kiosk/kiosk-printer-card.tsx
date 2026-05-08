@@ -81,21 +81,38 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           ? 'success'
           : 'muted';
 
+  // Station ID derivado do printerId — primeiros 4 chars em uppercase.
+  const stationId = `STN-${printerId.slice(0, 4).toUpperCase()}`;
+
   return (
     <div
+      data-mc-card
       className={cn(
         'relative block rounded-2xl border-2 overflow-hidden',
         TONE_CLASSES[tone],
       )}
     >
-      {/* Status header */}
+      {/* Status header — formato Mission Control */}
       <div className={cn('px-4 py-2 flex items-center gap-2', TONE_HEADER_CLASSES[tone])}>
+        <span
+          data-mc-led
+          className="shrink-0"
+          aria-hidden
+        />
         <StatusIcon status={status} />
         <span
+          data-mc-label
           className="font-semibold uppercase tracking-wider"
           style={{ fontSize: 'clamp(0.75rem, 1.2vw, 1rem)' }}
         >
           {STATUS_LABELS[status]}
+        </span>
+        <span
+          data-mc-id
+          className="text-muted-foreground"
+          style={{ fontSize: 'clamp(0.625rem, 0.95vw, 0.8125rem)' }}
+        >
+          // {stationId}
         </span>
         <span
           className="ml-auto font-semibold tracking-tight truncate text-foreground"
@@ -105,10 +122,11 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
         </span>
         {hmsCount > 0 ? (
           <span
-            className="rounded-full bg-danger px-2 py-0.5 font-bold text-danger-foreground"
+            data-mc-label
+            className="bg-danger px-2 py-0.5 font-bold text-danger-foreground"
             style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
           >
-            {hmsCount} erro{hmsCount > 1 ? 's' : ''}
+            ! {hmsCount} ALERT{hmsCount > 1 ? 'S' : ''}
           </span>
         ) : null}
       </div>

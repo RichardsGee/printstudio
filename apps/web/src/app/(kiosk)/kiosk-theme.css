@@ -1,0 +1,153 @@
+/* ==========================================================================
+   KIOSK MISSION MODE THEME
+   --------------------------------------------------------------------------
+   Tema sci-fi/comando — visual de Mission Control (NASA, governo, Matrix-ish).
+   Aplicar via wrapper com class="kiosk-mission".
+   --------------------------------------------------------------------------
+*/
+
+.kiosk-mission {
+  --mc-accent: #22d3ee;          /* cyan brilhante = primário */
+  --mc-accent-soft: #0891b2;     /* cyan escuro */
+  --mc-warning: #fbbf24;         /* amber */
+  --mc-danger: #ef4444;
+  --mc-success: #34d399;
+  --mc-bg: #050810;
+  --mc-fg: #d1d5db;
+  --mc-fg-dim: #6b7280;
+  --mc-grid-line: rgba(34, 211, 238, 0.05);
+  --mc-grid-line-strong: rgba(34, 211, 238, 0.12);
+
+  background-color: var(--mc-bg);
+  background-image:
+    /* grid fino */
+    linear-gradient(0deg, var(--mc-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mc-grid-line) 1px, transparent 1px),
+    /* grid grosso a cada 5 quadras */
+    linear-gradient(0deg, var(--mc-grid-line-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mc-grid-line-strong) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  background-position: 0 0;
+  color: var(--mc-fg);
+  position: relative;
+}
+
+/* Scanlines sutis fixas — efeito de monitor CRT antigo */
+.kiosk-mission::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.015) 0px,
+    rgba(255, 255, 255, 0.015) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 50;
+  mix-blend-mode: screen;
+}
+
+/* Vinheta sutil pra escurecer cantos */
+.kiosk-mission::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  z-index: 49;
+}
+
+/* Cards com canto cortado e brackets nos cantos */
+.kiosk-mission [data-mc-card] {
+  border-color: var(--mc-accent-soft);
+  border-radius: 0;
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.03) 0%, transparent 50%),
+    rgba(5, 8, 16, 0.85);
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 0 30px rgba(34, 211, 238, 0.06);
+}
+
+.kiosk-mission [data-mc-card]::before,
+.kiosk-mission [data-mc-card]::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--mc-accent);
+  pointer-events: none;
+}
+.kiosk-mission [data-mc-card]::before {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+.kiosk-mission [data-mc-card]::after {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Headers / IDs em monospace */
+.kiosk-mission [data-mc-id],
+.kiosk-mission [data-mc-label] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  letter-spacing: 0.08em;
+}
+
+/* LED status — bolinha pulsante */
+.kiosk-mission [data-mc-led] {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor, 0 0 2px currentColor;
+  animation: mc-led-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mc-led-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Banner — visual de cabeçalho de mission control */
+.kiosk-mission [data-mc-banner] {
+  border-radius: 0;
+  border: 1px solid var(--mc-accent-soft);
+  border-left: 3px solid var(--mc-accent);
+  background:
+    linear-gradient(90deg, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+    rgba(5, 8, 16, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.05);
+  position: relative;
+}
+
+.kiosk-mission [data-mc-banner]::after {
+  /* pequeno triângulo no canto sup-direito tipo "marker" */
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 0 12px 12px 0;
+  border-color: transparent var(--mc-accent) transparent transparent;
+  opacity: 0.6;
+}
+
+/* Override do primary global pra cyan dentro do kiosk */
+.kiosk-mission .text-primary { color: var(--mc-accent) !important; }
+.kiosk-mission .bg-primary { background-color: var(--mc-accent) !important; }
+.kiosk-mission .border-primary { border-color: var(--mc-accent) !important; }
+.kiosk-mission .from-primary\/80 { --tw-gradient-from: rgba(34, 211, 238, 0.8) !important; }
+.kiosk-mission .to-primary { --tw-gradient-to: var(--mc-accent) !important; }
