@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { PrinterState, PrinterStatus } from '@printstudio/shared';
 import { FilamentSwatch } from '@/components/filament-swatch';
-import { LayerView } from '@/components/layer-view';
+import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -106,7 +106,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               A1 + AMS
             </div>
           </div>
-          <LayerView
+          <KioskPrintObject
             printerId={printerId}
             cacheKey={state?.currentFile ?? null}
             currentLayer={state?.currentLayer ?? null}
