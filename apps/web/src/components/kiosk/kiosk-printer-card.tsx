@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
 import {
   Printer,
   Pause,
@@ -16,7 +15,6 @@ import {
 import type { PrinterState, PrinterStatus } from '@printstudio/shared';
 import { FilamentSwatch } from '@/components/filament-swatch';
 import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
-import { KioskPrintObject3D } from '@/components/kiosk/kiosk-print-object-3d';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -32,9 +30,6 @@ interface Props {
  * preenchimento vertical baseado nas camadas).
  */
 export function KioskPrinterCard({ printerId, name, state }: Props) {
-  const [meshFailed, setMeshFailed] = useState(false);
-  const onMeshError = useCallback(() => setMeshFailed(true), []);
-
   const status = state?.status ?? 'UNKNOWN';
   const progress = state?.progressPct ?? 0;
   const activeSlot =
@@ -111,26 +106,14 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               A1 + AMS
             </div>
           </div>
-          {meshFailed ? (
-            <KioskPrintObject
-              printerId={printerId}
-              cacheKey={state?.currentFile ?? null}
-              currentLayer={state?.currentLayer ?? null}
-              totalLayers={state?.totalLayers ?? null}
-              filamentColor={activeSlot?.color ?? null}
-              className="aspect-square"
-            />
-          ) : (
-            <KioskPrintObject3D
-              printerId={printerId}
-              cacheKey={state?.currentFile ?? null}
-              currentLayer={state?.currentLayer ?? null}
-              totalLayers={state?.totalLayers ?? null}
-              filamentColor={activeSlot?.color ?? null}
-              onError={onMeshError}
-              className="aspect-square"
-            />
-          )}
+          <KioskPrintObject
+            printerId={printerId}
+            cacheKey={state?.currentFile ?? null}
+            currentLayer={state?.currentLayer ?? null}
+            totalLayers={state?.totalLayers ?? null}
+            filamentColor={activeSlot?.color ?? null}
+            className="aspect-square"
+          />
         </div>
       ) : (
         <div className="relative aspect-[16/9] bg-gradient-to-b from-muted/30 to-background overflow-hidden flex items-center justify-center">
