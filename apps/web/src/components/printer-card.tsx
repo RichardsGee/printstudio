@@ -77,6 +77,11 @@ export function PrinterCard({ printerId, name, state }: Props) {
                 style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
               />
             </div>
+            {state?.stage && state.stage !== 'Imprimindo' ? (
+              <div className="mt-1 text-[11px] text-muted-foreground truncate">
+                {state.stage}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-1.5">

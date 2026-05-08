@@ -57,6 +57,7 @@ export async function registerJobRoutes(app: FastifyInstance): Promise<void> {
       running: number;
       total_duration_sec: number;
       avg_duration_sec: number;
+      total_filament_g: number;
     }>(sql`
       SELECT
         COUNT(*)::int AS total_jobs,
@@ -65,7 +66,8 @@ export async function registerJobRoutes(app: FastifyInstance): Promise<void> {
         COUNT(*) FILTER (WHERE status = 'CANCELLED')::int AS cancelled,
         COUNT(*) FILTER (WHERE status = 'RUNNING')::int AS running,
         COALESCE(SUM(duration_sec), 0)::int AS total_duration_sec,
-        COALESCE(AVG(duration_sec) FILTER (WHERE status = 'SUCCESS'), 0)::int AS avg_duration_sec
+        COALESCE(AVG(duration_sec) FILTER (WHERE status = 'SUCCESS'), 0)::int AS avg_duration_sec,
+        COALESCE(SUM(filament_used_g), 0)::float AS total_filament_g
       FROM print_jobs
       ${pidFilter}
     `);
@@ -78,6 +80,7 @@ export async function registerJobRoutes(app: FastifyInstance): Promise<void> {
       running: 0,
       total_duration_sec: 0,
       avg_duration_sec: 0,
+      total_filament_g: 0,
     };
 
     // Histograma de falhas por hora do dia (0..23).
@@ -103,6 +106,7 @@ export async function registerJobRoutes(app: FastifyInstance): Promise<void> {
       successRate,
       totalDurationSec: agg.total_duration_sec,
       avgDurationSec: agg.avg_duration_sec,
+      totalFilamentG: Number(agg.total_filament_g) || 0,
       failuresByHour: failures.map((r) => ({ hour: Number(r.hour), count: Number(r.count) })),
     };
   });

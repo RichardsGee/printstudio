@@ -178,6 +178,55 @@ export function mapStage(stage?: string): string | null {
 }
 
 /**
+ * Mapa de `stg_cur` — o campo confiável da A1 pro sub-estado atual.
+ * `mc_print_stage` fica latched em "2" (Nivelando mesa) durante todo
+ * o print e não reflete o estado corrente. `stg_cur` muda em tempo
+ * real. Códigos a partir de engenharia reversa da firmware A1/P1/X1.
+ */
+const STG_CUR_MAP: Record<number, string> = {
+  0: 'Imprimindo',
+  1: 'Nivelando mesa',
+  2: 'Pré-aquecendo mesa',
+  3: 'Varrendo XY',
+  4: 'Trocando filamento',
+  5: 'Pausa M400',
+  6: 'Pausa por acabou filamento',
+  7: 'Aquecendo bico',
+  8: 'Calibrando extrusão',
+  9: 'Scanning da mesa',
+  10: 'Inspecionando primeira camada',
+  11: 'Identificando placa',
+  12: 'Calibrando Micro Lidar',
+  13: 'Homing',
+  14: 'Limpando bico',
+  15: 'Verificando temperatura do bico',
+  16: 'Pausado pelo usuário',
+  17: 'Pausa por tampa aberta',
+  18: 'Calibrando Micro Lidar',
+  19: 'Calibrando fluxo de extrusão',
+  20: 'Pausa por temperatura do bico',
+  21: 'Pausa por temperatura da mesa',
+  22: 'Descarregando filamento',
+  23: 'Carregando filamento',
+  24: 'Pausa (skip step)',
+  25: 'Pausa por AMS desconectado',
+  26: 'Pausa por ventoinha lenta',
+  27: 'Resfriando câmara',
+  28: 'Pausa por temperatura da câmara',
+  29: 'Pausa via G-code',
+  30: 'Guardando arquivo',
+  31: 'Encerrando impressão',
+  32: 'Finalizando',
+  33: 'Cortando filamento',
+  [-1]: null as unknown as string,
+};
+
+export function mapStgCur(stgCur?: number): string | null {
+  if (stgCur === undefined || stgCur === null) return null;
+  return STG_CUR_MAP[stgCur] ?? null;
+}
+
+/**
  * Merge a new Bambu report into an existing PrinterState.
  * Bambu sends partial updates — fields not present should keep prior values.
  */
@@ -192,10 +241,19 @@ export function applyReport(
   const nozzleDiameter =
     print.nozzle_diameter !== undefined ? String(print.nozzle_diameter) : previous.nozzleDiameter;
   const status = print.gcode_state !== undefined ? mapGcodeState(print.gcode_state) : previous.status;
-  const rawStage = print.mc_print_stage !== undefined ? mapStage(print.mc_print_stage) : previous.stage;
+  // `stg_cur` é o campo confiável pro sub-estado atual (bate com o que
+  // a impressora mostra no LCD). `mc_print_stage` fica latched em "2"
+  // (Nivelando mesa) durante todo o print, por isso é só fallback
+  // quando a firmware não envia `stg_cur`.
+  const rawStage =
+    print.stg_cur !== undefined
+      ? mapStgCur(print.stg_cur)
+      : print.mc_print_stage !== undefined
+      ? mapStage(print.mc_print_stage)
+      : previous.stage;
   // Em status terminais (FINISH/IDLE/FAILED), suprime o stage antigo
   // — evita mostrar "Concluído" + "Imprimindo" simultaneamente quando
-  // a Bambu demora um ciclo pra atualizar `mc_print_stage`.
+  // a Bambu demora um ciclo pra atualizar.
   const stage =
     status === 'FINISH' || status === 'IDLE' || status === 'FAILED' || status === 'OFFLINE'
       ? null
@@ -297,6 +355,7 @@ export function emptyState(printerId: string): PrinterState {
     nozzleDiameter: null,
     nozzleType: null,
     stage: null,
+    filamentWeightG: null,
     updatedAt: new Date().toISOString(),
   };
 }

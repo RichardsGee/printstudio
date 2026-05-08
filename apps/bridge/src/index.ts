@@ -52,6 +52,7 @@ async function main(): Promise<void> {
       token: config.env.CLOUD_API_TOKEN,
       bridgeId: config.env.BRIDGE_ID,
       manager,
+      layers,
       logger,
     });
     cloud.start();

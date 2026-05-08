@@ -109,7 +109,14 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
       try {
         if (msg.type === 'bridge.state') {
           const state = PrinterStateSchema.parse(msg.payload);
-          await db
+
+          // Broadcast primeiro — DB é secundário e não pode atrasar a UI.
+          // A latência até o EasyPanel remoto (~150-300ms) multiplicava a
+          // percepção de "laggy" no dashboard.
+          hub.broadcast(state.printerId, { type: 'printer.state', payload: state });
+
+          // Upsert async — erros são apenas logados, não bloqueiam relay.
+          void db
             .insert(printerState)
             .values({
               printerId: state.printerId,
@@ -182,7 +189,8 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
                 stateChangeReason: sql`excluded.state_change_reason`,
                 updatedAt: sql`excluded.updated_at`,
               },
-            });
+            })
+            .catch((err) => logger.warn({ err, printerId: state.printerId }, 'printer_state upsert failed'));
 
           // Detecta transições de lifecycle e grava em print_jobs.
           const prevStatus = lastStatus.get(state.printerId);
@@ -212,6 +220,17 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
               )
               .catch((err) => logger.warn({ err }, 'print_jobs: start insert failed'));
           } else if (lifecycleAction?.type === 'finish') {
+            // Estima filament consumido: SUCCESS usa o peso total do .3mf;
+            // FAILED/CANCELLED prorata por layer atual / total (aprox).
+            const totalWeight = state.filamentWeightG ?? null;
+            const filamentUsedG =
+              totalWeight === null
+                ? null
+                : lifecycleAction.success
+                ? totalWeight
+                : state.totalLayers && state.currentLayer
+                ? (totalWeight * state.currentLayer) / state.totalLayers
+                : null;
             void db
               .update(printJobs)
               .set({
@@ -219,6 +238,8 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
                 finishedAt: new Date(),
                 durationSec: sql`EXTRACT(EPOCH FROM (NOW() - ${printJobs.startedAt}))::int`,
                 layersTotal: state.totalLayers ?? null,
+                filamentUsedG:
+                  filamentUsedG !== null ? filamentUsedG.toFixed(2) : null,
               })
               .where(and(eq(printJobs.printerId, state.printerId), eq(printJobs.status, 'RUNNING')))
               .catch((err) => logger.warn({ err }, 'print_jobs: finish update failed'));
@@ -247,8 +268,6 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
           void ensurePrinterName(state.printerId).then(() =>
             processStateAlerts(state, printerNames),
           );
-
-          hub.broadcast(state.printerId, { type: 'printer.state', payload: state });
         } else if (msg.type === 'bridge.event') {
           const event = PrinterEventSchema.parse(msg.payload);
           await db.insert(events).values({

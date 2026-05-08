@@ -18,9 +18,10 @@ export interface PrinterClientEvents {
 }
 
 // Throttle state emits so we don't flood downstream consumers — mas
-// ainda dá sensação de real-time. 500ms = 2 updates/s, o suficiente
-// pra temperatura/progresso parecerem contínuos sem saturar a WS.
-const STATE_EMIT_THROTTLE_MS = 500;
+// ainda dá sensação de real-time. 250ms = 4 updates/s, fluido o
+// suficiente pra temperatura/progresso/calibração parecerem contínuos
+// sem saturar a WS.
+const STATE_EMIT_THROTTLE_MS = 250;
 
 export class PrinterClient extends EventEmitter {
   private client: MqttClient | null = null;
@@ -60,8 +61,11 @@ export class PrinterClient extends EventEmitter {
       username: 'bblp',
       password: this.config.accessCode,
       rejectUnauthorized: false,
+      servername: this.config.serial,
       reconnectPeriod: 5000,
       connectTimeout: 10_000,
+      keepalive: 5,
+      protocolVersion: 4,
       clean: true,
       clientId: `printstudio-bridge-${this.config.id.slice(0, 8)}`,
     });

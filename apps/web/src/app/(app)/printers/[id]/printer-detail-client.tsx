@@ -42,6 +42,7 @@ import { PrintPreview } from '@/components/print-preview';
 import { PtfeTube } from '@/components/ptfe-tube';
 import { PowerUsage } from '@/components/power-usage';
 import { FilamentUsage } from '@/components/filament-usage';
+import { FilamentTotal } from '@/components/filament-total';
 import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -330,11 +331,17 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                   state?.speedPercent != null ? `${Math.round(state.speedPercent)}%` : '—'
                 }
               />
-              <FilamentUsage
-                printerId={printerId}
-                cacheKey={state?.currentFile ?? null}
-                progressPct={progress}
-              />
+              <div className="flex flex-col gap-1">
+                <FilamentTotal
+                  printerId={printerId}
+                  refreshKey={state?.status === 'FINISH' ? state.updatedAt : null}
+                />
+                <FilamentUsage
+                  printerId={printerId}
+                  cacheKey={state?.currentFile ?? null}
+                  progressPct={progress}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -485,6 +492,28 @@ export function PrinterDetailClient({ printerId, name }: Props) {
  * operações finais etc.).
  */
 const NOTABLE_STAGES_WHILE_PRINTING = new Set([
+  // Calibração / preparação antes da primeira camada
+  'Preparando',
+  'Nivelando mesa',
+  'Pré-aquecendo mesa',
+  'Aquecendo bico',
+  'Limpando bico',
+  'Limpando ponta do bico',
+  'Verificando fluxo',
+  'Verificando temperatura do bico',
+  'Calibrando Z',
+  'Calibrando extrusão',
+  'Calibrando fluxo de extrusão',
+  'Calibrando Micro Lidar',
+  'Calibrando ruído do motor',
+  'Calibrando temperatura do hotend',
+  'Scanning da mesa',
+  'Inspecionando primeira camada',
+  'Identificando placa',
+  'Homing',
+  'Carregando filamento',
+  'Descarregando filamento',
+  // Pausas e finalização
   'Trocando filamento',
   'Pausa M400',
   'Pausa por acabou filamento',

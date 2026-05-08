@@ -32,6 +32,16 @@ pnpm dev:bridge
 | POST   | `/api/printers/:id/command`  | Body: `{ action }`             |
 | WS     | `/ws`                        | Real-time BridgeMessage stream |
 
+## MQTT gotchas (Bambu A1)
+
+Três coisas que, se faltarem, o printer aceita a ligação TLS mas recusa silenciosamente o MQTT CONNECT — o cliente fica a pender em `UNKNOWN`:
+
+1. **`servername: <serial>`** — a A1 usa o número de série como TLS SNI para autenticar a sessão. Sem isto, o handshake TLS completa mas o `CONNECT` nunca é aceite. **Sintoma:** `mqtt.connect()` não emite `connect` nem `error`; apenas silêncio até ao timeout.
+2. **Access code atualizado** — o código de LAN muda quando é regenerado no LCD. A fonte de verdade no Mac é `~/Library/Application Support/BambuStudio/BambuStudio.conf` (campo `access_code` em cleartext, indexado por serial). No Windows é equivalente em `%APPDATA%\BambuStudio\`.
+3. **LAN Mode NÃO é obrigatório** — a A1 aceita clientes MQTT locais mesmo quando configurada para cloud (e mesmo com a Bambu Studio aberta a consumir o slot cloud em paralelo). O bloqueio costuma ser SNI/access code, não "LAN mode desligado".
+
+Script de diagnóstico: `apps/bridge/scripts/mqtt-probe.ts` — testa a conexão isolada com as opções certas. Usa-o antes de mexer em código do client.
+
 ## Camera streams
 
 Camera streaming is NOT handled inside Node. Install [go2rtc](https://github.com/AlexxIT/go2rtc) separately and use `go2rtc.yaml.example` as a starting point.

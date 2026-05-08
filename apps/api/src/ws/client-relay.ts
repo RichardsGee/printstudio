@@ -4,6 +4,7 @@ import {
   type PrinterState,
   type HmsError,
   type AmsSlot,
+  type AmsUnit,
   type SpeedMode,
 } from '@printstudio/shared';
 import { randomUUID } from 'node:crypto';
@@ -31,6 +32,7 @@ async function loadSnapshot(printerIds: string[]): Promise<PrinterState[]> {
     currentFile: r.currentFile,
     hmsErrors: (r.hmsErrors ?? []) as HmsError[],
     amsSlots: (r.amsState ?? []) as AmsSlot[],
+    amsUnits: (r.amsUnits ?? []) as AmsUnit[],
     activeSlotIndex: r.activeSlotIndex,
     speedMode: r.speedMode as SpeedMode | null,
     speedPercent: r.speedPercent === null ? null : Number(r.speedPercent),
@@ -38,9 +40,16 @@ async function loadSnapshot(printerIds: string[]): Promise<PrinterState[]> {
     fanPartCoolingPct: r.fanPartCoolingPct,
     fanAuxPct: r.fanAuxPct,
     fanChamberPct: r.fanChamberPct,
+    fanHeatbreakPct: r.fanHeatbreakPct,
     nozzleDiameter: r.nozzleDiameter,
     nozzleType: r.nozzleType,
     stage: r.stage,
+    doorOpen: r.doorOpen,
+    isFromSdCard: r.isFromSdCard,
+    lifecycle: r.lifecycle,
+    printType: r.printType,
+    printErrorCode: r.printErrorCode,
+    stateChangeReason: r.stateChangeReason,
     updatedAt: r.updatedAt.toISOString(),
   }));
 }

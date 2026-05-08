@@ -40,6 +40,7 @@ export const BambuPrintReportSchema = z.object({
   mc_percent: z.number().optional(),
   mc_remaining_time: z.number().optional(),
   mc_print_stage: z.string().optional(),
+  stg_cur: z.number().optional(),
   layer_num: z.number().optional(),
   total_layer_num: z.number().optional(),
   nozzle_temper: z.number().optional(),

@@ -8,6 +8,7 @@ import {
   type CommandAction,
 } from '@printstudio/shared';
 import type { MqttManager } from '../mqtt/manager.js';
+import type { LayersManager } from '../gcode/layers-manager.js';
 import type { Logger } from '../logger.js';
 
 interface CloudClientOpts {
@@ -15,6 +16,7 @@ interface CloudClientOpts {
   token: string;
   bridgeId: string;
   manager: MqttManager;
+  layers?: LayersManager;
   logger: Logger;
 }
 
@@ -35,7 +37,17 @@ export class CloudClient {
     this.stopped = false;
     this.connect();
     this.opts.manager.on('state', (state: PrinterState) => {
-      this.send({ type: 'bridge.state', payload: state });
+      // Injeta peso total do filamento (do .3mf parseado pelo
+      // LayersManager) pra que a API possa persistir em print_jobs
+      // quando o job terminar.
+      const layersCache = this.opts.layers?.get(state.printerId);
+      const filamentWeightG = layersCache?.data.metadata.filamentWeightG;
+      const total =
+        Array.isArray(filamentWeightG) && filamentWeightG.length > 0
+          ? filamentWeightG.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0)
+          : null;
+      const enriched: PrinterState = { ...state, filamentWeightG: total };
+      this.send({ type: 'bridge.state', payload: enriched });
     });
     this.opts.manager.on('event', (event: PrinterEvent) => {
       this.send({ type: 'bridge.event', payload: event });

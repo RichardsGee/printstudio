@@ -80,6 +80,10 @@ export const PrinterStateSchema = z.object({
   printType: z.string().nullable(),                      // local | cloud | sd
   printErrorCode: z.number().nullable(),                 // print_error code
   stateChangeReason: z.string().nullable(),              // motivo da última transição
+  /** Peso total estimado do filamento pro job atual (g). Extraído
+   *  do .3mf via layers metadata. Usado pra persistir em print_jobs
+   *  quando o job termina com SUCCESS. */
+  filamentWeightG: z.number().nullable().optional(),
   updatedAt: z.string().datetime(),
 });
 export type PrinterState = z.infer<typeof PrinterStateSchema>;
