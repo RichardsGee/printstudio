@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { PrinterState, PrinterStatus } from '@printstudio/shared';
 import { FilamentSwatch } from '@/components/filament-swatch';
+import { HeartbeatPulse } from '@/components/heartbeat-pulse';
 import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
 import { RealisticPreview3D } from '@/components/realistic-preview-3d';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
@@ -190,6 +191,14 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
                   Slot {activeSlot.slot + 1}
                 </div>
               </div>
+              {/* EKG/batimento — ao lado do filamento, ritmo segue
+                  speedPercent da impressora. Pausa quando não imprimindo. */}
+              <HeartbeatPulse
+                active={status === 'PRINTING'}
+                color={activeSlot.color ?? '#3b82f6'}
+                speedPercent={state?.speedPercent ?? 100}
+                className="ml-1 shrink-0"
+              />
             </div>
           ) : (
             <div
