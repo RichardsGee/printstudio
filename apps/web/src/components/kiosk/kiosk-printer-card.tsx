@@ -187,6 +187,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               totalLayers={state?.totalLayers ?? null}
               progressPct={state?.progressPct ?? null}
               filamentColor={activeSlot?.color ?? null}
+              accentColor="#22d3ee"
               className="aspect-square"
             />
           ) : (

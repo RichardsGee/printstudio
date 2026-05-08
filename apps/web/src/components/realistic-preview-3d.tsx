@@ -38,6 +38,12 @@ interface Props {
    *  quando currentLayer ainda é 0 (primeira camada em andamento). */
   progressPct?: number | null;
   filamentColor?: string | null;
+  /** Cor do tema usada nos elementos NÃO físicos: ghost (parte não
+   *  impressa), cilindro de energia, anel. Quando não passada, usa
+   *  derivações da cor do filamento (default antigo). Pra dashboard
+   *  Mission Mode passar '#22d3ee' (cyan) — separa visualmente o
+   *  "real" (filamento) do "data overlay" (cyan). */
+  accentColor?: string | null;
   className?: string;
 }
 
@@ -134,6 +140,7 @@ export function RealisticPreview3D({
   totalLayers,
   progressPct,
   filamentColor,
+  accentColor,
   className,
 }: Props) {
   const [mesh, setMesh] = useState<MeshPayload | null>(null);
@@ -270,7 +277,15 @@ export function RealisticPreview3D({
     const belowPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     const abovePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
+    // PRINTED = cor real do filamento (fidelidade visual da peça).
+    // GHOST/ENERGIA/RING = cor do tema (accentColor se passada,
+    // senão deriva do filamento). Separação visual: parte impressa
+    // = "matéria real", parte não impressa = "data overlay".
     const baseColor = new THREE.Color(normalizeHex(filamentColor));
+    const themeColor = accentColor
+      ? new THREE.Color(normalizeHex(accentColor))
+      : baseColor.clone().lerp(new THREE.Color(0xffffff), 0.4);
+
     const printedMaterial = new THREE.MeshStandardMaterial({
       color: baseColor,
       roughness: 0.6,
@@ -278,9 +293,8 @@ export function RealisticPreview3D({
       side: THREE.DoubleSide,
       clippingPlanes: [belowPlane],
     });
-    const ghostColor = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.4);
     const ghostMaterial = new THREE.MeshStandardMaterial({
-      color: ghostColor,
+      color: themeColor,
       transparent: true,
       opacity: 0.18,
       roughness: 0.85,
@@ -296,7 +310,7 @@ export function RealisticPreview3D({
 
     const ringGeo = new THREE.RingGeometry(meshRadius * 0.85, meshRadius * 0.95, 64);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: baseColor,
+      color: themeColor,
       transparent: true,
       opacity: 0.9,
       side: THREE.DoubleSide,
@@ -320,7 +334,7 @@ export function RealisticPreview3D({
     const energyTexture = createEnergyTexture();
     const energyMat = new THREE.MeshBasicMaterial({
       map: energyTexture,
-      color: baseColor,
+      color: themeColor,
       transparent: true,
       opacity: 0.5,
       blending: THREE.AdditiveBlending,
@@ -396,7 +410,7 @@ export function RealisticPreview3D({
       renderer.dispose();
       try { container.removeChild(renderer.domElement); } catch { /* */ }
     };
-  }, [mesh, filamentColor]);
+  }, [mesh, filamentColor, accentColor]);
 
   // Update camera quando o ângulo muda — sem recriar a cena inteira.
   useEffect(() => {
