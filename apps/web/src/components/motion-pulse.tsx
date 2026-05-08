@@ -3,6 +3,13 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
+/** Normaliza hex que pode vir com alpha (`6BC872FF`) ou sem `#`. */
+function normalizeHex(c: string | null | undefined): string {
+  if (!c) return '#3b82f6';
+  const m = c.match(/^#?([0-9a-fA-F]{6,8})$/);
+  return m ? `#${m[1].slice(0, 6)}` : '#3b82f6';
+}
+
 interface Props {
   /** Quando false (pausada/ociosa/etc), pulsação congela em flatline. */
   active?: boolean;
@@ -69,8 +76,8 @@ export function MotionPulse({
       const ampPx = h * 0.32;
 
       ctx.clearRect(0, 0, w, h);
-      ctx.lineWidth = Math.max(1, 1.4 * dpr);
-      ctx.strokeStyle = color ?? '#3b82f6';
+      ctx.lineWidth = Math.max(1, 1.6 * dpr);
+      ctx.strokeStyle = normalizeHex(color);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
@@ -124,8 +131,8 @@ export function MotionPulse({
       <canvas
         ref={canvasRef}
         style={{
-          width: 'clamp(60px, 9vw, 110px)',
-          height: 'clamp(14px, 1.8vw, 22px)',
+          width: 'clamp(110px, 16vw, 200px)',
+          height: 'clamp(20px, 2.4vw, 32px)',
           display: 'block',
         }}
       />
