@@ -1,27 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildMeshFromLayers, type LayersInput } from '@/lib/build-mesh-from-layers';
 
 const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
 const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
 
-interface MeshPayload {
+interface LayersPayload extends LayersInput {
   fileName: string;
-  vertices: number[];
-  indices: number[];
-  bounds: {
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-    minZ: number;
-    maxZ: number;
-  };
-  vertexCount: number;
-  triangleCount: number;
+  totalLayers: number;
 }
 
 interface Props {
@@ -51,13 +41,15 @@ interface SceneRefs {
 }
 
 /**
- * Render 3D do objeto sendo impresso, com plano de corte baseado
- * na camada atual. Mesh extraído do `.3mf` pelo bridge, deduplicado
- * pra mostrar 1 instância. Câmera frontal com leve auto-rotation.
+ * Render 3D do objeto sendo impresso, reconstruído a partir dos
+ * toolpaths do gcode (`layers.json` do bridge). Cada camada vira
+ * um polígono extrudado (perímetro externo apenas), empilhados
+ * formam o objeto. Plano de corte horizontal mostra o que já foi
+ * impresso vs ghost.
  *
- * Implementação em Three.js puro (sem R3F) pra evitar problemas de
- * compatibilidade entre @react-three/fiber e React 19 RC. Cena criada
- * uma vez por mesh e atualizada imperativamente nas mudanças de prop.
+ * Por que não usar o mesh direto do .3mf? Bambu Studio strip o mesh
+ * antes de mandar pra impressora — o .3mf só tem gcode + metadata.
+ * A reconstrução por gcode é a única fonte 3D disponível em runtime.
  */
 export function KioskPrintObject3D({
   printerId,
@@ -68,34 +60,31 @@ export function KioskPrintObject3D({
   onError,
   className,
 }: Props) {
-  const [mesh, setMesh] = useState<MeshPayload | null>(null);
+  const [layers, setLayers] = useState<LayersPayload | null>(null);
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty' | 'error'>('loading');
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneRefs | null>(null);
   const retryRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch do mesh com retry exponencial.
+  // Fetch dos layers com retry exponencial.
   useEffect(() => {
     let alive = true;
     let attempt = 0;
     setStatus('loading');
-    setMesh(null);
+    setLayers(null);
 
     const tryFetch = (): void => {
-      const fileParam = cacheKey ? `&file=${encodeURIComponent(cacheKey)}` : '';
-      const url = `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/mesh.json?v=${encodeURIComponent(
+      const url = `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/layers.json?v=${encodeURIComponent(
         cacheKey ?? 'none',
-      )}${fileParam}`;
+      )}`;
 
       fetch(url)
         .then(async (r) => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const data: MeshPayload = await r.json();
+          const data: LayersPayload = await r.json();
           if (!alive) return;
-          if (!data.vertices?.length || !data.indices?.length) {
-            throw new Error('empty mesh');
-          }
-          setMesh(data);
+          if (!data.layers?.length) throw new Error('empty layers');
+          setLayers(data);
           setStatus('ok');
         })
         .catch(() => {
@@ -119,9 +108,20 @@ export function KioskPrintObject3D({
     };
   }, [printerId, cacheKey, onError]);
 
-  // Setup da cena (única por mesh). Recria scene quando o mesh muda.
+  // Build da geometria — só refaz quando layers mudam, não a cada frame.
+  const builtMesh = useMemo(() => {
+    if (!layers) return null;
+    try {
+      const result = buildMeshFromLayers(layers);
+      return result;
+    } catch {
+      return null;
+    }
+  }, [layers]);
+
+  // Setup da cena (única por geometria). Recria scene quando o mesh muda.
   useEffect(() => {
-    if (!mesh || !containerRef.current) return;
+    if (!builtMesh || !containerRef.current) return;
 
     const container = containerRef.current;
     let disposed = false;
@@ -149,7 +149,7 @@ export function KioskPrintObject3D({
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(35, initialW / initialH, 0.1, 5000);
 
-    // Lights
+    // Lights — ambient pra não ficar com áreas escurão; key+fill pra dar volume.
     scene.add(new THREE.AmbientLight(0xffffff, 0.55));
     const key = new THREE.DirectionalLight(0xffffff, 1.5);
     key.position.set(2, 4, 3);
@@ -158,39 +158,7 @@ export function KioskPrintObject3D({
     fill.position.set(-3, 2, -2);
     scene.add(fill);
 
-    // Geometry — converte Z-up (Bambu) pra Y-up (Three.js).
-    const verts = new Float32Array(mesh.vertices.length);
-    for (let i = 0; i < mesh.vertices.length; i += 3) {
-      const x = mesh.vertices[i];
-      const y = mesh.vertices[i + 1];
-      const z = mesh.vertices[i + 2];
-      verts[i] = x;
-      verts[i + 1] = z;
-      verts[i + 2] = -y;
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    const useUint32 = mesh.indices.some((v) => v > 0xffff);
-    geometry.setIndex(
-      new THREE.BufferAttribute(
-        useUint32 ? new Uint32Array(mesh.indices) : new Uint16Array(mesh.indices),
-        1,
-      ),
-    );
-    geometry.computeVertexNormals();
-    geometry.computeBoundingBox();
-
-    // Centraliza com chão em y=0.
-    const bbox = geometry.boundingBox!;
-    const cx = (bbox.max.x + bbox.min.x) / 2;
-    const cz = (bbox.max.z + bbox.min.z) / 2;
-    const offsetY = bbox.min.y;
-    geometry.translate(-cx, -offsetY, -cz);
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
-
-    const meshHeight = bbox.max.y - bbox.min.y;
-    const meshRadius = geometry.boundingSphere!.radius;
+    const { geometry, height: meshHeight, radius: meshRadius } = builtMesh;
     const centerY = meshHeight / 2;
 
     // Posição inicial da câmera baseada no bounding sphere.
@@ -209,7 +177,7 @@ export function KioskPrintObject3D({
 
     const printedMaterial = new THREE.MeshStandardMaterial({
       color: baseColor,
-      roughness: 0.55,
+      roughness: 0.6,
       metalness: 0.05,
       side: THREE.DoubleSide,
       clippingPlanes: [belowPlane],
@@ -246,7 +214,7 @@ export function KioskPrintObject3D({
 
     scene.add(group);
 
-    // Chão sutil pra dar contexto da mesa de impressão.
+    // Chão sutil — disco escuro lembrando a mesa.
     const floorGeo = new THREE.CircleGeometry(meshRadius * 1.6, 64);
     const floorMat = new THREE.MeshBasicMaterial({
       color: 0x0a0f1c,
@@ -275,7 +243,6 @@ export function KioskPrintObject3D({
     };
     sceneRef.current = refs;
 
-    // Resize observer — mantém o canvas fluido com o container.
     const ro = new ResizeObserver((entries) => {
       const e = entries[0];
       if (!e || disposed) return;
@@ -287,8 +254,6 @@ export function KioskPrintObject3D({
     });
     ro.observe(container);
 
-    // Loop de animação — auto-rotation 8°/s + render. Usa visibilitychange
-    // pra parar o RAF quando a tab tá oculta (economiza CPU em kiosk).
     let lastFrame = performance.now();
     const tick = (now: number): void => {
       if (disposed) return;
@@ -319,9 +284,9 @@ export function KioskPrintObject3D({
         /* ignore */
       }
     };
-  }, [mesh, filamentColor, onError]);
+  }, [builtMesh, filamentColor, onError]);
 
-  // Atualiza clipping plane + cor sem recriar a cena.
+  // Atualiza clipping plane sem recriar a cena.
   useEffect(() => {
     const refs = sceneRef.current;
     if (!refs) return;
@@ -349,7 +314,7 @@ export function KioskPrintObject3D({
     >
       <div ref={containerRef} className="absolute inset-0" />
 
-      {status !== 'ok' ? (
+      {status !== 'ok' || !builtMesh ? (
         <div className="absolute inset-0 grid place-items-center text-muted-foreground bg-gradient-to-b from-[#0a0f1c] to-[#020409]">
           <div className="flex flex-col items-center gap-2">
             <Box
@@ -358,10 +323,10 @@ export function KioskPrintObject3D({
             />
             <span style={{ fontSize: 'clamp(0.75rem, 1.1vw, 0.9375rem)' }}>
               {status === 'loading'
-                ? 'Carregando modelo 3D…'
+                ? 'Reconstruindo modelo 3D…'
                 : status === 'error'
-                  ? 'Sem modelo 3D'
-                  : 'Aguardando modelo…'}
+                  ? 'Sem dados de camadas'
+                  : 'Aguardando análise do gcode…'}
             </span>
           </div>
         </div>

@@ -88,41 +88,6 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
     return reply;
   });
 
-  // 3D mesh do objeto sendo impresso, extraído do .3mf. Apenas o
-  // primeiro objeto (quando o usuário imprime múltiplas cópias do
-  // mesmo modelo, retorna 1 instância). JSON gzipado — payload típico
-  // 200KB-2MB raw vira 50-300KB compactado.
-  app.get<{ Params: { id: string }; Querystring: { file?: string } }>(
-    '/api/printers/:id/mesh.json',
-    async (req, reply) => {
-      const cached = layers.getMesh(req.params.id);
-      if (!cached) {
-        return reply.code(404).send({ error: 'no mesh parsed yet' });
-      }
-      const requested = req.query.file;
-      if (requested && requested !== cached.fileName) {
-        return reply.code(404).send({ error: 'mesh for different file' });
-      }
-      const body = JSON.stringify({
-        fileName: cached.fileName,
-        fetchedAt: cached.fetchedAt,
-        ...cached.data,
-      });
-      const acceptsGzip = /gzip/i.test(String(req.headers['accept-encoding'] ?? ''));
-      reply
-        .type('application/json')
-        .header('Cache-Control', 'no-store')
-        .header('Access-Control-Allow-Origin', '*')
-        .header('X-Mesh-File', encodeURIComponent(cached.fileName));
-      if (acceptsGzip) {
-        reply.header('Content-Encoding', 'gzip').send(gzipSync(body));
-      } else {
-        reply.send(body);
-      }
-      return reply;
-    },
-  );
-
   // Current print-job thumbnail extracted from the printer's `.3mf` via FTPS.
   // Quando o cliente passa `?file=`, só devolve se o cache bater com o
   // arquivo solicitado — evita mostrar thumbnail antigo entre a mudança

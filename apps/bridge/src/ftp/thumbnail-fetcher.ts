@@ -2,14 +2,10 @@ import { Client as FtpClient } from 'basic-ftp';
 import AdmZip from 'adm-zip';
 import { Writable } from 'node:stream';
 import type { Logger } from '../logger.js';
-import { extractPrimaryMesh, type MeshData } from './mesh-extractor.js';
 
 export interface ThreeMfPayload {
   thumbnail: Buffer | null;
   gcode: string | null;
-  /** Mesh do primeiro objeto — pode ser null pra .3mf sem geometria
-   *  (raro mas pode acontecer em arquivos só com gcode). */
-  mesh: MeshData | null;
   sourcePath: string;
 }
 
@@ -52,18 +48,12 @@ export class ThumbnailFetcher {
         if (!buf) continue;
         const thumb = extractPlateThumbnail(buf);
         const gcode = extractPlateGcode(buf);
-        const mesh = extractPrimaryMesh(buf);
-        if (thumb || gcode || mesh) {
+        if (thumb || gcode) {
           this.logger.info(
-            {
-              path,
-              thumbBytes: thumb?.length ?? 0,
-              gcodeBytes: gcode?.length ?? 0,
-              meshTriangles: mesh?.triangleCount ?? 0,
-            },
+            { path, thumbBytes: thumb?.length ?? 0, gcodeBytes: gcode?.length ?? 0 },
             '3mf contents extracted',
           );
-          return { thumbnail: thumb, gcode, mesh, sourcePath: path };
+          return { thumbnail: thumb, gcode, sourcePath: path };
         }
       }
       this.logger.debug({ candidates }, 'no thumbnail/gcode found in any candidate');
