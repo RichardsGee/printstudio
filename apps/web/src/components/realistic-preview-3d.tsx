@@ -65,6 +65,10 @@ interface SceneRefs {
   meshRadius: number;
   dist: number;
   centerY: number;
+  /** clipY corrente — atualizado pelo clipping effect, lido pelo
+   *  tick pra posicionar as ondas de calor saindo do print head. */
+  currentClipY: number;
+  ripplesActive: boolean;
   rafId: number | null;
 }
 
@@ -339,12 +343,14 @@ export function RealisticPreview3D({
     energyMesh.scale.y = 0.001;
     group.add(energyMesh);
 
-    // Ondas de calor — 3 anéis horizontais que expandem e desvanecem
-    // em loop, dando a sensação de vapor/distorção saindo do print.
+    // Ondas de calor/vapor — 4 anéis que NASCEM no print head e
+    // SOBEM cruzando o objeto, com pequena expansão lateral e fade
+    // out conforme sobem. Phases distribuídas pra parecer assíncrono.
     const heatRipples: HeatRipple[] = [];
-    const baseRippleR = footprintRadius * 1.0;
-    for (let i = 0; i < 3; i++) {
-      const rGeo = new THREE.RingGeometry(baseRippleR * 0.95, baseRippleR, 64);
+    const baseRippleR = footprintRadius * 0.98;
+    const NUM_RIPPLES = 4;
+    for (let i = 0; i < NUM_RIPPLES; i++) {
+      const rGeo = new THREE.RingGeometry(baseRippleR * 0.92, baseRippleR, 72);
       const rMat = new THREE.MeshBasicMaterial({
         color: baseColor,
         transparent: true,
@@ -355,11 +361,12 @@ export function RealisticPreview3D({
       });
       const r = new THREE.Mesh(rGeo, rMat);
       r.rotation.x = -Math.PI / 2;
+      r.visible = false;
       group.add(r);
       heatRipples.push({
         mesh: r,
         material: rMat,
-        phase: i / 3,
+        phase: i / NUM_RIPPLES,
         baseRadius: baseRippleR,
       });
     }
@@ -383,7 +390,10 @@ export function RealisticPreview3D({
       printedMaterial, ghostMaterial, ringMesh,
       energyMesh, energyTexture, heatRipples,
       belowPlane, abovePlane, meshHeight, meshRadius,
-      dist, centerY: frameCenterY, rafId: null,
+      dist, centerY: frameCenterY,
+      currentClipY: 0,
+      ripplesActive: false,
+      rafId: null,
     };
     sceneRef.current = refs;
 
@@ -406,15 +416,25 @@ export function RealisticPreview3D({
       group.rotation.y += dt * 0.14;
       energyTexture.offset.y -= dt * 0.4;
 
-      // Ondas de calor: ciclo de 3s, expansão de 1x → 1.6x raio com
-      // fadeout. Phases distribuídas pra parecerem assíncronas.
+      // Ondas de calor/vapor: cada onda nasce no print head (clipY)
+      // e sobe pra cima atravessando o ghost do objeto. Distância
+      // máxima da subida = 1.4x meshHeight. Ciclo de 4s. Cada onda
+      // tem fase própria pra parecer assíncrono.
       const tSec = now / 1000;
-      for (const rip of heatRipples) {
-        const cycle = ((tSec * 0.33 + rip.phase) % 1); // 0..1
-        const expand = 1 + cycle * 0.6;
-        const opacity = (1 - cycle) * 0.35;
-        rip.mesh.scale.set(expand, 1, expand);
-        rip.material.opacity = opacity;
+      if (refs.ripplesActive) {
+        const clipY = refs.currentClipY;
+        const riseHeight = refs.meshHeight * 1.4;
+        for (const rip of heatRipples) {
+          const cycle = ((tSec * 0.25 + rip.phase) % 1); // 4s
+          // Curva de easing: começa concentrada (alpha alto), some
+          // gradualmente conforme sobe.
+          const expand = 1 + cycle * 0.35;
+          const opacity = Math.pow(1 - cycle, 1.6) * 0.55;
+          rip.mesh.position.y = clipY + cycle * riseHeight;
+          rip.mesh.scale.set(expand, 1, expand);
+          rip.material.opacity = opacity;
+          rip.mesh.visible = opacity > 0.01;
+        }
       }
 
       renderer.render(scene, camera);
@@ -488,12 +508,12 @@ export function RealisticPreview3D({
     refs.energyMesh.scale.y = Math.max(clipY, minEnergyHeight);
     refs.energyMesh.visible = progress > 0 && progress < 1;
 
-    // Heat ripples emanam da altura atual do print head — sobem com
-    // a impressão, sempre visíveis enquanto o print rola.
-    const ripplesVisible = progress > 0 && progress < 1;
-    for (const rip of refs.heatRipples) {
-      rip.mesh.position.y = clipY;
-      rip.mesh.visible = ripplesVisible;
+    // Salva clipY + flag pra que o tick anime as ondas SUBINDO a
+    // partir da altura atual do print head.
+    refs.currentClipY = clipY;
+    refs.ripplesActive = progress > 0 && progress < 1;
+    if (!refs.ripplesActive) {
+      for (const rip of refs.heatRipples) rip.mesh.visible = false;
     }
   }, [currentLayer, totalLayers, progressPct, mesh]);
 
