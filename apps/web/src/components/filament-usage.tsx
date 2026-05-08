@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import { Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
-const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
+import { getBridgeBase } from '@/lib/bridge-url';
 
 interface Meta {
   filamentWeightG: number[];
@@ -43,7 +42,7 @@ export function FilamentUsage({ printerId, cacheKey, progressPct, className }: P
 
     const run = (): void => {
       fetch(
-        `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/layers.json?v=${encodeURIComponent(cacheKey ?? 'none')}`,
+        `${getBridgeBase()}/api/printers/${printerId}/layers.json?v=${encodeURIComponent(cacheKey ?? 'none')}`,
       )
         .then((r) => (r.ok ? r.json() : Promise.reject()))
         .then((d) => {

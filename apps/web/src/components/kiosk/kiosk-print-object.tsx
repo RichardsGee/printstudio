@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
-const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
+import { getBridgeBase } from '@/lib/bridge-url';
 
 interface Props {
   printerId: string;
@@ -54,7 +53,7 @@ export function KioskPrintObject({
 
     const tryFetch = (): void => {
       const fileParam = cacheKey ? `&file=${encodeURIComponent(cacheKey)}` : '';
-      const url = `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/thumbnail.png?v=${encodeURIComponent(
+      const url = `${getBridgeBase()}/api/printers/${printerId}/thumbnail.png?v=${encodeURIComponent(
         cacheKey ?? 'none',
       )}${fileParam}`;
 

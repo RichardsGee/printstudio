@@ -19,8 +19,7 @@ import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
 import { RealisticPreview3D } from '@/components/realistic-preview-3d';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
 
-const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
-const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
+import { getBridgeBase } from '@/lib/bridge-url';
 
 interface Props {
   printerId: string;
@@ -40,7 +39,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
   const [hasUploadedModel, setHasUploadedModel] = useState<boolean | null>(null);
   useEffect(() => {
     let alive = true;
-    fetch(`http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/uploaded-model.info`)
+    fetch(`${getBridgeBase()}/api/printers/${printerId}/uploaded-model.info`)
       .then((r) => { if (alive) setHasUploadedModel(r.ok); })
       .catch(() => { if (alive) setHasUploadedModel(false); });
     return () => { alive = false; };

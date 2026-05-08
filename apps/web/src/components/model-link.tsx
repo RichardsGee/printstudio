@@ -6,8 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
-const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
+import { getBridgeBase } from '@/lib/bridge-url';
 
 interface ModelMeta {
   originalName: string;
@@ -36,7 +35,7 @@ export function ModelLink({ printerId, className }: Props) {
   const fetchInfo = async (): Promise<void> => {
     try {
       const r = await fetch(
-        `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/uploaded-model.info`,
+        `${getBridgeBase()}/api/printers/${printerId}/uploaded-model.info`,
       );
       if (r.ok) setMeta(await r.json());
       else setMeta(null);
@@ -63,7 +62,7 @@ export function ModelLink({ printerId, className }: Props) {
       const fd = new FormData();
       fd.append('file', file);
       const r = await fetch(
-        `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/upload-model`,
+        `${getBridgeBase()}/api/printers/${printerId}/upload-model`,
         { method: 'POST', body: fd },
       );
       if (!r.ok) {
@@ -85,7 +84,7 @@ export function ModelLink({ printerId, className }: Props) {
     setUploading(true);
     try {
       await fetch(
-        `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/uploaded-model`,
+        `${getBridgeBase()}/api/printers/${printerId}/uploaded-model`,
         { method: 'DELETE' },
       );
       setMeta(null);

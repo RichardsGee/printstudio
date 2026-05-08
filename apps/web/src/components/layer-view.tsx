@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Layers as LayersIcon, Maximize2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
-const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
+import { getBridgeBase } from '@/lib/bridge-url';
 
 interface LayerPath {
   tool: number;
@@ -117,7 +116,7 @@ export function LayerView({
     setData(null);
 
     const run = (): void => {
-      const url = `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/layers.json?v=${encodeURIComponent(
+      const url = `${getBridgeBase()}/api/printers/${printerId}/layers.json?v=${encodeURIComponent(
         cacheKey ?? 'none',
       )}`;
       fetch(url)

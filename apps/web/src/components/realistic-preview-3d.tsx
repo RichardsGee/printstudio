@@ -5,8 +5,7 @@ import * as THREE from 'three';
 import { Box, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
-const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
+import { getBridgeBase } from '@/lib/bridge-url';
 
 interface MeshPayload {
   fileName: string;
@@ -100,7 +99,7 @@ export function RealisticPreview3D({
     setStatus('loading');
     setMesh(null);
 
-    const url = `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/uploaded-model.json`;
+    const url = `${getBridgeBase()}/api/printers/${printerId}/uploaded-model.json`;
     fetch(url)
       .then(async (r) => {
         if (r.status === 404) throw new Error('no-model');

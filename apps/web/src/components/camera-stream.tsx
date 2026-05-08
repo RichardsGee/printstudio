@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { Play, Square, VideoOff } from 'lucide-react';
 
-const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'printstudio.local';
-const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
+import { getBridgeBase } from '@/lib/bridge-url';
 
 interface Props {
   printerId: string;
@@ -25,7 +24,7 @@ export function CameraStream({ printerId }: Props) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [nonce, setNonce] = useState(0);
 
-  const src = `http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/camera.mjpeg?t=${nonce}`;
+  const src = `${getBridgeBase()}/api/printers/${printerId}/camera.mjpeg?t=${nonce}`;
 
   const start = (): void => {
     setStatus('loading');
