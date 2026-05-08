@@ -60,6 +60,9 @@ interface SceneRefs {
   energyMesh: THREE.Mesh;
   energyMaterial: THREE.MeshBasicMaterial;
   energyTexture: THREE.CanvasTexture;
+  pulseMesh: THREE.Mesh;
+  pulseMaterial: THREE.MeshBasicMaterial;
+  pulseTexture: THREE.CanvasTexture;
   haloMesh: THREE.Mesh;
   haloMaterial: THREE.MeshBasicMaterial;
   belowPlane: THREE.Plane;
@@ -142,6 +145,53 @@ function createEnergyTexture(): THREE.CanvasTexture {
     ctx.fillRect(lane.x, 0, lane.w, H);
   }
 
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1);
+  return tex;
+}
+
+/** Alpha map vertical: opaco no chão, transparente no topo. Aplicado
+ *  como alphaMap nos materials das camadas de energia, faz tudo
+ *  esmaecer conforme sobe — sensação etérea, sem corte abrupto. */
+function createAlphaGradient(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  // Canvas y=0 (topo) = alpha 0, y=128 (base) = alpha 1.
+  // Com flipY default da CanvasTexture, isso mapeia pra v=1
+  // (topo do cilindro = transparente) e v=0 (base = opaco).
+  const grad = ctx.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0.0, 'rgba(255,255,255,0)');     // topo: invisível
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.6)');   // transição suave
+  grad.addColorStop(0.75, 'rgba(255,255,255,1)');    // chega no full
+  grad.addColorStop(1.0, 'rgba(255,255,255,1)');     // base: máximo
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1, 128);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
+/** Textura do "pulse forte" — listra única bem brilhante (igual era
+ *  o energy original antes da v2). Vai rolar mais rápido em cima da
+ *  textura ambient pra dar a sensação de "carga acelerando". */
+function createPulseTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.42, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.58, 'rgba(255,255,255,0)');
+  grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 4, 256);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
@@ -355,9 +405,15 @@ export function RealisticPreview3D({
       true,
     );
     energyGeo.translate(0, 0.5, 0);
+
+    // Alpha map vertical compartilhado entre todas as camadas de
+    // energia — fade etéreo do chão até o topo.
+    const alphaGradient = createAlphaGradient();
+
     const energyTexture = createEnergyTexture();
     const energyMat = new THREE.MeshBasicMaterial({
       map: energyTexture,
+      alphaMap: alphaGradient,
       color: themeColor,
       transparent: true,
       opacity: 0.5,
@@ -368,6 +424,24 @@ export function RealisticPreview3D({
     const energyMesh = new THREE.Mesh(energyGeo, energyMat);
     energyMesh.scale.y = 0.001;
     group.add(energyMesh);
+
+    // Pulse forte — segunda camada com listra brilhante única
+    // rolando mais rápido. Mesmo geometry, opacity menor mas
+    // visualmente mais "punch" pelo brilho concentrado.
+    const pulseTexture = createPulseTexture();
+    const pulseMat = new THREE.MeshBasicMaterial({
+      map: pulseTexture,
+      alphaMap: alphaGradient,
+      color: themeColor,
+      transparent: true,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const pulseMesh = new THREE.Mesh(energyGeo, pulseMat);
+    pulseMesh.scale.y = 0.001;
+    group.add(pulseMesh);
 
     // Halo externo — cilindro maior, sem textura, opacity bem baixa.
     // Dá o glow ao redor da energia (efeito de campo de força).
@@ -381,9 +455,10 @@ export function RealisticPreview3D({
     );
     haloGeo.translate(0, 0.5, 0);
     const haloMat = new THREE.MeshBasicMaterial({
+      alphaMap: alphaGradient,
       color: themeColor,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.18,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       depthWrite: false,
@@ -411,6 +486,7 @@ export function RealisticPreview3D({
       printedMaterial, ghostMaterial,
       ringMesh, ringMaterial: ringMat,
       energyMesh, energyMaterial: energyMat, energyTexture,
+      pulseMesh, pulseMaterial: pulseMat, pulseTexture,
       haloMesh, haloMaterial: haloMat,
       belowPlane, abovePlane, meshHeight, meshRadius,
       dist, centerY: frameCenterY, rafId: null,
@@ -434,14 +510,16 @@ export function RealisticPreview3D({
       const dt = (now - lastFrame) / 1000;
       lastFrame = now;
       group.rotation.y += dt * 0.14;
+      // Camada ambient (data-stream) — rolagem padrão
       energyTexture.offset.y -= dt * 0.4;
+      // Camada pulse — rolagem ~2x mais rápida pra dar "carga"
+      pulseTexture.offset.y -= dt * 0.85;
 
       // Pulse de respiração: sin wave 0..1 com período de 2.4s.
-      // Modula opacity da energia, do halo e do ring pra dar
-      // sensação de "alimentando" a peça.
       const pulse = (Math.sin((now / 1000) * (Math.PI * 2 / 2.4)) + 1) / 2;
       energyMat.opacity = 0.42 + pulse * 0.18;
-      haloMat.opacity = 0.05 + pulse * 0.12;
+      pulseMat.opacity = 0.55 + pulse * 0.30;
+      haloMat.opacity = 0.10 + pulse * 0.16;
       ringMat.opacity = 0.78 + pulse * 0.22;
 
       renderer.render(scene, camera);
@@ -463,6 +541,9 @@ export function RealisticPreview3D({
       energyMat.dispose();
       energyGeo.dispose();
       energyTexture.dispose();
+      pulseMat.dispose();
+      pulseTexture.dispose();
+      alphaGradient.dispose();
       haloMat.dispose();
       haloGeo.dispose();
       geometry.dispose();
@@ -510,10 +591,14 @@ export function RealisticPreview3D({
     // a 5% de progresso, scale.y = 0.25mm (invisível). Mínimo:
     // o maior entre 15% da altura do mesh e 5mm absolutos.
     const minEnergyHeight = Math.max(refs.meshHeight * 0.15, 5);
-    refs.energyMesh.scale.y = Math.max(clipY, minEnergyHeight);
-    refs.energyMesh.visible = progress > 0 && progress < 1;
-    refs.haloMesh.scale.y = Math.max(clipY, minEnergyHeight);
-    refs.haloMesh.visible = progress > 0 && progress < 1;
+    const energyH = Math.max(clipY, minEnergyHeight);
+    const showEnergy = progress > 0 && progress < 1;
+    refs.energyMesh.scale.y = energyH;
+    refs.energyMesh.visible = showEnergy;
+    refs.pulseMesh.scale.y = energyH;
+    refs.pulseMesh.visible = showEnergy;
+    refs.haloMesh.scale.y = energyH;
+    refs.haloMesh.visible = showEnergy;
   }, [currentLayer, totalLayers, progressPct, mesh]);
 
   function cycleViewAngle(e: React.MouseEvent): void {
