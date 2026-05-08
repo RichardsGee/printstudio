@@ -43,37 +43,20 @@ export class ThumbnailFetcher {
 
     try {
       const candidates = await this.findCandidatePaths(client, fileNameHint);
-      this.logger.info({ ip: this.ip, fileNameHint, candidates }, 'ftp: trying candidates');
-      const tried: Array<{ path: string; bytes: number; reason: string }> = [];
       for (const path of candidates) {
-        const t0 = Date.now();
         const buf = await this.downloadFile(client, path);
-        if (!buf) {
-          tried.push({ path, bytes: 0, reason: 'download null' });
-          continue;
-        }
+        if (!buf) continue;
         const thumb = extractPlateThumbnail(buf);
         const gcode = extractPlateGcode(buf);
         if (thumb || gcode) {
           this.logger.info(
-            {
-              path,
-              thumbBytes: thumb?.length ?? 0,
-              gcodeBytes: gcode?.length ?? 0,
-              downloadMs: Date.now() - t0,
-              totalBytes: buf.length,
-            },
+            { path, thumbBytes: thumb?.length ?? 0, gcodeBytes: gcode?.length ?? 0 },
             '3mf contents extracted',
           );
           return { thumbnail: thumb, gcode, sourcePath: path };
         }
-        tried.push({
-          path,
-          bytes: buf.length,
-          reason: 'no thumbnail/gcode in zip',
-        });
       }
-      this.logger.warn({ ip: this.ip, fileNameHint, tried }, 'ftp: no candidate produced thumbnail/gcode');
+      this.logger.debug({ candidates }, 'no thumbnail/gcode found in any candidate');
       return null;
     } finally {
       client.close();
@@ -81,10 +64,7 @@ export class ThumbnailFetcher {
   }
 
   private async connect(): Promise<FtpClient | null> {
-    // Timeout de 90s — .3mf pode ter 30+MB e o FTPS implícito da Bambu
-    // é lento (TLS handshake + transferência criptografada). 15s era
-    // marginal pra arquivos pequenos e sempre falhava nos grandes.
-    const client = new FtpClient(90_000);
+    const client = new FtpClient(15_000);
     client.ftp.verbose = false;
     try {
       await client.access({
@@ -112,14 +92,8 @@ export class ThumbnailFetcher {
   ): Promise<string[]> {
     const bases = ['/cache', '/'];
     const paths: string[] = [];
-    const hintNorm = fileNameHint
-      ? fileNameHint
-          .replace(/^\//, '')
-          .replace(/\.(gcode|gcode\.3mf|3mf)$/i, '')
-          .toLowerCase()
-      : null;
 
-    // 1) Tenta caminhos diretos pelo hint (rápido quando o nome bate).
+    // 1) If we have a file hint, try direct paths first.
     if (fileNameHint) {
       const clean = fileNameHint.replace(/^\//, '');
       const withoutExt = clean.replace(/\.(gcode|gcode\.3mf|3mf)$/i, '');
@@ -128,49 +102,28 @@ export class ThumbnailFetcher {
       if (!clean.endsWith('.gcode.3mf')) paths.push(`/cache/${withoutExt}.gcode.3mf`);
     }
 
-    // 2) Lista o diretório e usa o nome RETORNADO pela listagem (que tem
-    //    o encoding/escaping corretos pra esse FTP server). Match por
-    //    igualdade case-insensitive primeiro; senão por inclusão.
-    //    Isso contorna o bug do servidor FTP da Bambu que retorna 550
-    //    em downloads diretos quando o nome tem `%` ou outros chars.
-    const listed: string[] = [];
+    // 2) Fall back to listing known dirs and picking the newest .3mf.
     for (const base of bases) {
       try {
         const list = await client.list(base);
-        const threeMfFiles = list.filter((f) => f.isFile && /\.3mf$/i.test(f.name));
-
-        // Match exato pelo hint
-        if (hintNorm) {
-          const exact = threeMfFiles.find(
-            (f) => f.name.replace(/\.(gcode|gcode\.3mf|3mf)$/i, '').toLowerCase() === hintNorm,
-          );
-          if (exact) listed.push(`${base}/${exact.name}`.replace(/\/+/g, '/'));
-
-          // Match parcial — caso a Bambu trunque o nome no MQTT
-          const partial = threeMfFiles.filter((f) => {
-            const name = f.name.replace(/\.(gcode|gcode\.3mf|3mf)$/i, '').toLowerCase();
-            return name !== hintNorm && (name.includes(hintNorm) || hintNorm.includes(name));
+        const threeMf = list
+          .filter((f) => f.isFile && /\.3mf$/i.test(f.name))
+          .sort((a, b) => {
+            const at = a.modifiedAt?.getTime() ?? 0;
+            const bt = b.modifiedAt?.getTime() ?? 0;
+            return bt - at;
           });
-          for (const f of partial) listed.push(`${base}/${f.name}`.replace(/\/+/g, '/'));
-        }
-
-        // Fallback final: 3 primeiros .3mf da listagem (sem confiar em
-        // modifiedAt que vem undefined da A1).
-        for (const f of threeMfFiles.slice(0, 3)) {
-          listed.push(`${base}/${f.name}`.replace(/\/+/g, '/'));
-        }
+        for (const f of threeMf.slice(0, 3)) paths.push(`${base}/${f.name}`.replace(/\/+/g, '/'));
       } catch {
         /* dir may not exist — ignore */
       }
     }
-    paths.push(...listed);
 
     // Dedup preserving order.
     return Array.from(new Set(paths));
   }
 
   private async downloadFile(client: FtpClient, path: string): Promise<Buffer | null> {
-    const t0 = Date.now();
     const chunks: Buffer[] = [];
     const writable = new Writable({
       write(chunk, _enc, cb) {
@@ -180,17 +133,10 @@ export class ThumbnailFetcher {
     });
     try {
       await client.downloadTo(writable, path);
-      const buf = Buffer.concat(chunks);
-      this.logger.info({ path, bytes: buf.length, ms: Date.now() - t0 }, 'ftp download ok');
-      return buf;
+      return Buffer.concat(chunks);
     } catch (err) {
-      this.logger.warn(
-        {
-          path,
-          err: err instanceof Error ? err.message : String(err),
-          bytesReceived: chunks.reduce((acc, c) => acc + c.length, 0),
-          ms: Date.now() - t0,
-        },
+      this.logger.debug(
+        { path, err: err instanceof Error ? err.message : String(err) },
         'ftp download failed',
       );
       return null;
