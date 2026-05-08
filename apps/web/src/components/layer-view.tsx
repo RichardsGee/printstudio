@@ -464,17 +464,10 @@ function LayerSvg({
           pointer-events: none;
           transition: opacity 300ms ease;
         }
-        .lyr-done-${idSuffix}   { opacity: 1; }
+        .lyr-done-${idSuffix}   { opacity: 0.95; }
         .lyr-active-${idSuffix} { opacity: 1; }
-        .lyr-future-${idSuffix} { opacity: 0.06; }
-        .lyr-preview-${idSuffix} { opacity: 0.7; }
-        .lyr-done-${idSuffix} svg path,
-        .lyr-active-${idSuffix} svg path {
-          filter: drop-shadow(0 0.6px 0 rgba(0,0,0,0.7));
-        }
-        .lyr-active-${idSuffix} svg path {
-          filter: drop-shadow(0 0 1.2px currentColor) drop-shadow(0 0 0.5px #fff);
-        }
+        .lyr-future-${idSuffix} { opacity: 0.05; }
+        .lyr-preview-${idSuffix} { opacity: 0.65; }
       `}</style>
 
       <div className={`lyr-stage-${idSuffix}`}>
@@ -503,9 +496,7 @@ function LayerSvg({
                       key={tool}
                       d={d}
                       stroke={isActive ? '#ffffff' : c}
-                      // strokeWidth em pixels (constante em qualquer zoom/escala)
-                      // graças a vector-effect=non-scaling-stroke abaixo.
-                      strokeWidth={isActive ? 2.4 : 1.2}
+                      strokeWidth={isActive ? 1.4 : 0.8}
                       fill="none"
                       strokeLinejoin="round"
                       strokeLinecap="round"
