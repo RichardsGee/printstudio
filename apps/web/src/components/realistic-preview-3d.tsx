@@ -37,11 +37,37 @@ interface SceneRefs {
   printedMaterial: THREE.MeshStandardMaterial;
   ghostMaterial: THREE.MeshStandardMaterial;
   ringMesh: THREE.Mesh;
+  energyMesh: THREE.Mesh;
+  energyTexture: THREE.CanvasTexture;
   belowPlane: THREE.Plane;
   abovePlane: THREE.Plane;
   meshHeight: number;
   meshRadius: number;
   rafId: number | null;
+}
+
+/** Cria uma textura vertical de listras pra ser animada subindo na
+ *  parede do cilindro de "energia". 4×256px é suficiente. */
+function createEnergyTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(0.15, 'rgba(255,255,255,0.05)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.6)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+  grad.addColorStop(0.7, 'rgba(255,255,255,0.7)');
+  grad.addColorStop(0.85, 'rgba(255,255,255,0.05)');
+  grad.addColorStop(1.0, 'rgba(255,255,255,0.85)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 4, 256);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 2);
+  return tex;
 }
 
 /**
@@ -208,6 +234,33 @@ export function RealisticPreview3D({
     ringMesh.rotation.x = -Math.PI / 2;
     group.add(ringMesh);
 
+    // Cilindro de "energia" subindo do chão — listras animadas que
+    // sobem na parede, altura proporcional ao progresso da impressão.
+    // Geometry com altura 1 e base em y=0 (translate up) — escalamos
+    // o Y conforme as camadas sobem.
+    const energyGeo = new THREE.CylinderGeometry(
+      meshRadius * 1.05,
+      meshRadius * 1.05,
+      1,
+      48,
+      1,
+      true, // open ends
+    );
+    energyGeo.translate(0, 0.5, 0);
+    const energyTexture = createEnergyTexture();
+    const energyMat = new THREE.MeshBasicMaterial({
+      map: energyTexture,
+      color: baseColor,
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const energyMesh = new THREE.Mesh(energyGeo, energyMat);
+    energyMesh.scale.y = 0.001;
+    group.add(energyMesh);
+
     scene.add(group);
 
     const floorGeo = new THREE.CircleGeometry(meshRadius * 1.6, 64);
@@ -225,6 +278,7 @@ export function RealisticPreview3D({
     const refs: SceneRefs = {
       renderer, scene, camera, group,
       printedMaterial, ghostMaterial, ringMesh,
+      energyMesh, energyTexture,
       belowPlane, abovePlane, meshHeight, meshRadius, rafId: null,
     };
     sceneRef.current = refs;
@@ -246,6 +300,9 @@ export function RealisticPreview3D({
       const dt = (now - lastFrame) / 1000;
       lastFrame = now;
       group.rotation.y += dt * 0.14;
+      // Listras de energia sobem (texture offset vai pra baixo no UV
+      // pra que visualmente as listras se movam pra cima na cilindro).
+      energyTexture.offset.y -= dt * 0.6;
       renderer.render(scene, camera);
       refs.rafId = requestAnimationFrame(tick);
     };
@@ -262,6 +319,9 @@ export function RealisticPreview3D({
       ringGeo.dispose();
       floorMat.dispose();
       floorGeo.dispose();
+      energyMat.dispose();
+      energyGeo.dispose();
+      energyTexture.dispose();
       geometry.dispose();
       renderer.dispose();
       try { container.removeChild(renderer.domElement); } catch { /* */ }
@@ -283,6 +343,9 @@ export function RealisticPreview3D({
     refs.ringMesh.visible = progress > 0 && progress < 1;
     refs.ghostMaterial.visible = progress < 1;
     refs.printedMaterial.clippingPlanes = progress < 1 ? [refs.belowPlane] : [];
+    // Cilindro de energia sobe junto com a impressão.
+    refs.energyMesh.scale.y = Math.max(clipY, 0.001);
+    refs.energyMesh.visible = progress > 0 && progress < 1;
   }, [currentLayer, totalLayers]);
 
   return (
@@ -313,9 +376,14 @@ export function RealisticPreview3D({
         </div>
       ) : null}
 
-      {status === 'ok' && currentLayer != null && totalLayers != null ? (
-        <div className="absolute bottom-2 right-2 rounded-md bg-background/80 backdrop-blur-sm border border-border/60 px-2 py-1 font-mono tabular-nums text-foreground pointer-events-none text-xs">
-          {currentLayer}<span className="text-muted-foreground"> / {totalLayers}</span>
+      {status === 'ok' && currentLayer != null && totalLayers != null && totalLayers > 0 ? (
+        <div className="absolute bottom-2 right-2 rounded-md bg-background/80 backdrop-blur-sm border border-border/60 px-2 py-1 font-mono tabular-nums text-foreground pointer-events-none">
+          <span className="text-xs">
+            {currentLayer}<span className="text-muted-foreground"> / {totalLayers}</span>
+          </span>
+          <span className="ml-2 text-xs font-semibold text-primary">
+            {Math.round((currentLayer / totalLayers) * 100)}%
+          </span>
         </div>
       ) : null}
     </div>
