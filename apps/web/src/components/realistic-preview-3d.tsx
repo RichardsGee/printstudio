@@ -187,14 +187,14 @@ export function RealisticPreview3D({
     const meshRadius = geometry.boundingSphere!.radius;
     const centerY = meshHeight / 2;
 
-    // Zoom mais próximo (1.15 vs antes 1.6) — mostra o detalhe da
-    // camada/clipping plane sem ficar com muita borda preta.
+    // Distância da câmera com folga — modelo centralizado no frame
+    // sem ficar colado nas bordas, mas ainda dominante visualmente.
     const aspect = initialW / Math.max(1, initialH);
     const distH = meshRadius / Math.tan((35 * Math.PI) / 360);
     const distW = distH / aspect;
-    const dist = Math.max(distH, distW) * 1.15;
-    camera.position.set(0, centerY * 1.05, dist);
-    camera.lookAt(0, centerY * 0.5, 0);
+    const dist = Math.max(distH, distW) * 1.4;
+    camera.position.set(0, centerY * 1.1, dist);
+    camera.lookAt(0, centerY * 0.6, 0);
 
     const belowPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     const abovePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -252,7 +252,7 @@ export function RealisticPreview3D({
       map: energyTexture,
       color: baseColor,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.85,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       depthWrite: false,
@@ -329,6 +329,10 @@ export function RealisticPreview3D({
   }, [mesh, filamentColor]);
 
   // Update clipping plane sem recriar a cena.
+  // Inclui `mesh` nas deps pra garantir que roda DEPOIS do scene
+  // setup (que também depende de mesh) — sem isso, num refresh com
+  // currentLayer já populado, a cena monta com clipY=0 e nunca
+  // atualiza porque [currentLayer, totalLayers] já estão "estáveis".
   useEffect(() => {
     const refs = sceneRef.current;
     if (!refs) return;
@@ -343,10 +347,9 @@ export function RealisticPreview3D({
     refs.ringMesh.visible = progress > 0 && progress < 1;
     refs.ghostMaterial.visible = progress < 1;
     refs.printedMaterial.clippingPlanes = progress < 1 ? [refs.belowPlane] : [];
-    // Cilindro de energia sobe junto com a impressão.
     refs.energyMesh.scale.y = Math.max(clipY, 0.001);
     refs.energyMesh.visible = progress > 0 && progress < 1;
-  }, [currentLayer, totalLayers]);
+  }, [currentLayer, totalLayers, mesh]);
 
   return (
     <div
