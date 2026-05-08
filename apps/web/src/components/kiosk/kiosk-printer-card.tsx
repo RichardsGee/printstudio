@@ -12,6 +12,8 @@ import {
   Loader2,
   Clock,
   Layers,
+  Image as ImageIcon,
+  PencilRuler,
 } from 'lucide-react';
 import type { PrinterState, PrinterStatus } from '@printstudio/shared';
 import { Spool } from '@/components/spool';
@@ -36,6 +38,13 @@ interface Props {
  * preenchimento vertical baseado nas camadas).
  */
 export function KioskPrinterCard({ printerId, name, state }: Props) {
+  // Modo sketch da imagem da impressora — toggle persistido em
+  // localStorage (escolha global pra todos os cards).
+  const [sketchMode, setSketchMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('kiosk-printer-sketch') === '1';
+  });
+
   // Detecta se há .3mf vinculado pra escolher render: 3D realista
   // (modelo com mesh) vs PNG com fill vertical (fallback).
   // Re-checa quando o arquivo muda OU window foca (caso o usuário
@@ -151,15 +160,49 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
             <img
               src="/images/bambu-a1.png"
               alt="Bambu Lab A1"
-              className="max-h-full max-w-full object-contain p-2"
+              className={cn(
+                'max-h-full max-w-full object-contain p-2 transition-[filter] duration-300',
+                sketchMode && 'kiosk-printer-sketch',
+              )}
               draggable={false}
             />
             <div
+              data-mc-id
               className="absolute top-1.5 left-2 font-mono uppercase tracking-wider text-muted-foreground"
               style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}
             >
               A1 + AMS
             </div>
+
+            {/* Toggle modo sketch / real — clique não navega (stopPropagation) */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const next = !sketchMode;
+                setSketchMode(next);
+                if (typeof window !== 'undefined') {
+                  window.localStorage.setItem('kiosk-printer-sketch', next ? '1' : '0');
+                }
+              }}
+              className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-[var(--mc-accent-soft)] px-1.5 py-0.5 text-foreground hover:bg-background transition-colors"
+              aria-label={sketchMode ? 'Ver imagem real' : 'Ver sketch técnico'}
+              title={sketchMode ? 'IMAGE / REAL' : 'SKETCH / TECH'}
+            >
+              {sketchMode ? (
+                <ImageIcon className="h-3 w-3" />
+              ) : (
+                <PencilRuler className="h-3 w-3" />
+              )}
+              <span
+                data-mc-label
+                style={{ fontSize: 'clamp(0.5rem, 0.75vw, 0.625rem)' }}
+                className="uppercase tracking-wider"
+              >
+                {sketchMode ? 'REAL' : 'TECH'}
+              </span>
+            </button>
           </Link>
 
           {/* Painel de sensores no espaço sobrando — telemetria
