@@ -334,79 +334,6 @@ function FilamentLegend({ metadata }: { metadata?: LayersMetadata }) {
  * leve quanto a versão 2D mas com efeito tridimensional de verdade,
  * escalável pra centenas de camadas sem travar.
  */
-/**
- * Detecta se o print tem múltiplas cópias do mesmo objeto e retorna
- * a bbox de UMA cópia (a primeira pelo critério de área). Heurística:
- *
- * 1. Acha a layer com mais paths fechados de área significativa (≈
- *    a layer "mais cheia", geralmente perto do meio do print).
- * 2. Pega o maior path fechado dela = perímetro de uma cópia.
- * 3. Se a área desse perímetro < 25% da área total do print, é
- *    multi-cópia → retorna a bbox dele com padding.
- * 4. Senão retorna null (single-instance, mostra tudo).
- */
-function detectInstanceBbox(
-  data: LayersData,
-): { minX: number; maxX: number; minY: number; maxY: number } | null {
-  const isClosedSig = (pts: number[][]): boolean => {
-    if (!pts || pts.length < 4) return false;
-    const f = pts[0], l = pts[pts.length - 1];
-    return (f[0] - l[0]) ** 2 + (f[1] - l[1]) ** 2 < 1;
-  };
-  const polyArea = (pts: number[][]): number => {
-    let a = 0;
-    for (let i = 0; i < pts.length; i++) {
-      const j = (i + 1) % pts.length;
-      a += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
-    }
-    return Math.abs(a) / 2;
-  };
-
-  // Layer mais "rica" (mais paths fechados significativos).
-  let bestLayer: { paths: LayerPath[] } | null = null;
-  let bestCount = 0;
-  for (const layer of data.layers) {
-    let count = 0;
-    for (const p of layer.paths) {
-      if (isClosedSig(p.points) && polyArea(p.points) > 4) count++;
-    }
-    if (count > bestCount) { bestCount = count; bestLayer = layer; }
-  }
-  if (!bestLayer || bestCount < 2) return null;
-
-  // Maior path fechado dela.
-  let largest: number[][] | null = null;
-  let largestArea = 0;
-  for (const p of bestLayer.paths) {
-    if (!isClosedSig(p.points)) continue;
-    const a = polyArea(p.points);
-    if (a > largestArea) { largestArea = a; largest = p.points; }
-  }
-  if (!largest) return null;
-
-  // BBox da cópia.
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const pt of largest) {
-    if (pt[0] < minX) minX = pt[0];
-    if (pt[0] > maxX) maxX = pt[0];
-    if (pt[1] < minY) minY = pt[1];
-    if (pt[1] > maxY) maxY = pt[1];
-  }
-  const instArea = (maxX - minX) * (maxY - minY);
-  const overall = data.bounds;
-  const overallArea =
-    (overall.maxX - overall.minX) * (overall.maxY - overall.minY);
-  if (overallArea === 0) return null;
-
-  // Se a cópia ocupa >25% do print, provavelmente é single-instance.
-  if (instArea / overallArea > 0.25) return null;
-
-  // Padding 30% pra captar travels/blobs ao redor da cópia.
-  const w = maxX - minX, h = maxY - minY;
-  const pad = Math.max(w, h) * 0.3;
-  return { minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad };
-}
-
 function LayerSvg({
   data,
   currentLayer,
@@ -421,11 +348,6 @@ function LayerSvg({
   const layersRef = useRef<HTMLDivElement[]>([]);
 
   const { layerSvgs, bounds, zScalePx } = useMemo(() => {
-    // 1) Detecta se é multi-cópia: pega o maior path fechado da
-    //    layer mais "rica" (mais paths). Se a bbox dele for << que
-    //    a bbox total do print, são cópias e renderizamos só 1.
-    const instanceBbox = detectInstanceBbox(data);
-
     let minSX = Number.POSITIVE_INFINITY;
     let maxSX = Number.NEGATIVE_INFINITY;
     let minSY = Number.POSITIVE_INFINITY;
@@ -436,18 +358,6 @@ function LayerSvg({
       for (const poly of layer.paths) {
         const pts = poly.points;
         if (!pts || pts.length === 0) continue;
-
-        // Filtro single-copy: keep só paths cujo centroide cai dentro
-        // da bbox da instância detectada (com 5% de padding).
-        if (instanceBbox) {
-          let cx = 0, cy = 0;
-          for (const pt of pts) { cx += pt[0]; cy += pt[1]; }
-          cx /= pts.length; cy /= pts.length;
-          if (
-            cx < instanceBbox.minX || cx > instanceBbox.maxX ||
-            cy < instanceBbox.minY || cy > instanceBbox.maxY
-          ) continue;
-        }
 
         const [fx, fy] = project(pts[0][0], pts[0][1]);
         if (fx < minSX) minSX = fx;
@@ -550,26 +460,26 @@ function LayerSvg({
         .lyr-done-${idSuffix}    { opacity: 1; }
         .lyr-done-${idSuffix} svg path {
           stroke: var(--c-done);
-          stroke-width: 1.0;
+          stroke-width: 1.4;
         }
         /* Active = camada atual em destaque (branco quente) */
         .lyr-active-${idSuffix}  { opacity: 1; }
         .lyr-active-${idSuffix} svg path {
           stroke: #ffffff;
-          stroke-width: 1.6;
+          stroke-width: 2.0;
           filter: drop-shadow(0 0 0.6px #fff);
         }
         /* Future = ghost luminoso, independente da cor do filamento
            pra não sumir com filamento escuro sobre fundo preto. */
-        .lyr-future-${idSuffix}  { opacity: 0.55; }
+        .lyr-future-${idSuffix}  { opacity: 0.5; }
         .lyr-future-${idSuffix} svg path {
           stroke: #c8d1e0;
-          stroke-width: 0.7;
+          stroke-width: 0.9;
         }
         .lyr-preview-${idSuffix} { opacity: 0.85; }
         .lyr-preview-${idSuffix} svg path {
           stroke: var(--c-done);
-          stroke-width: 1.0;
+          stroke-width: 1.4;
         }
       `}</style>
 
