@@ -16,7 +16,6 @@ import {
 import type { PrinterState, PrinterStatus } from '@printstudio/shared';
 import { FilamentSwatch } from '@/components/filament-swatch';
 import { Spool } from '@/components/spool';
-import { PtfeTube } from '@/components/ptfe-tube';
 import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
 import { RealisticPreview3D } from '@/components/realistic-preview-3d';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
@@ -114,34 +113,52 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
         ) : null}
       </div>
 
-      {/* HERO unificado: SEMPRE grid 2:3 (Bambu | Objeto) — mesma
-          estrutura visual em qualquer estado pra consistência no
-          dashboard. Quando ociosa, slot do objeto fica como
-          placeholder estilizado. */}
+      {/* HERO grid 2:3 (Bambu+Spool stacked | Objeto). A coluna do
+          objeto é mais alta (aspect-square num slot 60% wider), então
+          a coluna esquerda tem espaço sobrando abaixo da Bambu — o
+          Spool ocupa esse espaço. */}
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 p-2.5 bg-gradient-to-b from-muted/30 to-background">
-        <Link
-          href={`/printers/${printerId}`}
-          aria-label={`Detalhes da ${name}`}
-          className={cn(
-            'relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex items-center justify-center',
-            'transition-transform hover:scale-[1.02] active:scale-[0.98]',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/images/bambu-a1.png"
-            alt="Bambu Lab A1"
-            className="max-h-full max-w-full object-contain p-2"
-            draggable={false}
-          />
-          <div
-            className="absolute top-1.5 left-2 font-mono uppercase tracking-wider text-muted-foreground"
-            style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}
+        <div className="flex flex-col gap-2 min-h-0">
+          <Link
+            href={`/printers/${printerId}`}
+            aria-label={`Detalhes da ${name}`}
+            className={cn(
+              'relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex items-center justify-center',
+              'transition-transform hover:scale-[1.02] active:scale-[0.98]',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            )}
           >
-            A1 + AMS
-          </div>
-        </Link>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/bambu-a1.png"
+              alt="Bambu Lab A1"
+              className="max-h-full max-w-full object-contain p-2"
+              draggable={false}
+            />
+            <div
+              className="absolute top-1.5 left-2 font-mono uppercase tracking-wider text-muted-foreground"
+              style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}
+            >
+              A1 + AMS
+            </div>
+          </Link>
+
+          {/* Spool ocupa o espaço sobrando até a altura do slot do
+              objeto. Cresce com a viewport. */}
+          {printing && activeSlot ? (
+            <div className="flex-1 min-h-0 flex items-center justify-center px-1">
+              <div className="aspect-square h-full max-w-full">
+                <Spool
+                  color={activeSlot.color ?? null}
+                  active
+                  rotating
+                  size="100%"
+                  className="!w-full !h-full !block"
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         {printing ? (
           hasUploadedModel ? (
@@ -168,35 +185,6 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
         )}
       </div>
 
-      {/* Row separada abaixo do hero: rolo de filamento (grande, ~70%
-          da altura da imagem da impressora) alimentando o tubo PTFE
-          que atravessa todo o card até a área do objeto 3D.
-          O Spool usa CSS clamp pra escalar com a viewport — fica
-          imponente em monitor mas continua proporcional em tablet. */}
-      {printing && activeSlot ? (
-        <div className="flex items-center gap-3 px-2.5 pb-2.5">
-          <div
-            className="relative shrink-0"
-            style={{
-              width: 'clamp(110px, 18vw, 220px)',
-              aspectRatio: '1',
-            }}
-          >
-            <Spool
-              color={activeSlot.color ?? null}
-              active
-              rotating
-              size="100%"
-              className="!w-full !h-full !block"
-            />
-          </div>
-          <PtfeTube
-            color={activeSlot.color ?? null}
-            active
-            className="flex-1 h-5"
-          />
-        </div>
-      ) : null}
 
       <div className="p-3 space-y-2.5">
         {/* Linha 1: filamento + progresso inline (só quando imprimindo) */}
