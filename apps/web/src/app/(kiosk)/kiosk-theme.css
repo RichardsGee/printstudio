@@ -63,6 +63,18 @@
   animation: mc-scanline-drift 6s linear infinite;
 }
 
+/* Demo mode — desabilita os pseudo-elementos fixed pra que a tema
+   possa ser renderizada dentro de outras páginas (ex: design system)
+   sem cobrir o viewport com scanlines/vinheta. */
+.kiosk-mission.demo-mode::before,
+.kiosk-mission.demo-mode::after {
+  display: none;
+}
+.kiosk-mission.demo-mode {
+  animation: none;
+  background-color: transparent;
+}
+
 @keyframes mc-scanline-drift {
   from { background-position: 0 0; }
   to   { background-position: 0 24px; }
