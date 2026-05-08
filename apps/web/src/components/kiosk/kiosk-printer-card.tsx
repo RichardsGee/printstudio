@@ -68,11 +68,9 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           : 'muted';
 
   return (
-    <Link
-      href={`/printers/${printerId}`}
+    <div
       className={cn(
-        'relative block rounded-2xl border-2 overflow-hidden transition-colors',
-        'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring',
+        'relative block rounded-2xl border-2 overflow-hidden',
         TONE_CLASSES[tone],
       )}
     >
@@ -106,7 +104,15 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           dashboard. Quando ociosa, slot do objeto fica como
           placeholder estilizado. */}
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 p-2.5 bg-gradient-to-b from-muted/30 to-background">
-        <div className="relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex items-center justify-center">
+        <Link
+          href={`/printers/${printerId}`}
+          aria-label={`Detalhes da ${name}`}
+          className={cn(
+            'relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex items-center justify-center',
+            'transition-transform hover:scale-[1.02] active:scale-[0.98]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          )}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/bambu-a1.png"
@@ -120,7 +126,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           >
             A1 + AMS
           </div>
-        </div>
+        </Link>
 
         {printing ? (
           hasUploadedModel ? (
@@ -257,7 +263,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           </div>
         ) : null}
       </div>
-    </Link>
+    </div>
   );
 }
 

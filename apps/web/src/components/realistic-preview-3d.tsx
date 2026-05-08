@@ -426,7 +426,11 @@ export function RealisticPreview3D({
     refs.energyMesh.visible = progress > 0 && progress < 1;
   }, [currentLayer, totalLayers, progressPct, mesh]);
 
-  function cycleViewAngle(): void {
+  function cycleViewAngle(e: React.MouseEvent): void {
+    // Defensivo: se algum dia o componente for envolvido em <Link>,
+    // o stopPropagation evita navegar ao trocar ângulo.
+    e.preventDefault();
+    e.stopPropagation();
     const idx = VIEW_ORDER.indexOf(viewAngle);
     const next = VIEW_ORDER[(idx + 1) % VIEW_ORDER.length];
     setViewAngle(next);
