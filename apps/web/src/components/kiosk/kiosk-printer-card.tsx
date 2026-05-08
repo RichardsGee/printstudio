@@ -36,14 +36,27 @@ interface Props {
 export function KioskPrinterCard({ printerId, name, state }: Props) {
   // Detecta se há .3mf vinculado pra escolher render: 3D realista
   // (modelo com mesh) vs PNG com fill vertical (fallback).
+  // Re-checa quando o arquivo muda OU window foca (caso o usuário
+  // tenha subido .3mf no detail page enquanto kiosk estava aberto).
   const [hasUploadedModel, setHasUploadedModel] = useState<boolean | null>(null);
+  const currentFile = state?.currentFile ?? null;
   useEffect(() => {
     let alive = true;
-    fetch(`${getBridgeBase()}/api/printers/${printerId}/uploaded-model.info`)
-      .then((r) => { if (alive) setHasUploadedModel(r.ok); })
-      .catch(() => { if (alive) setHasUploadedModel(false); });
-    return () => { alive = false; };
-  }, [printerId]);
+    const check = (): void => {
+      fetch(`${getBridgeBase()}/api/printers/${printerId}/uploaded-model.info`)
+        .then((r) => { if (alive) setHasUploadedModel(r.ok); })
+        .catch(() => { if (alive) setHasUploadedModel(false); });
+    };
+    check();
+    window.addEventListener('focus', check);
+    // Re-checa a cada 60s — pra kiosk fixo (sem focus/blur natural).
+    const interval = setInterval(check, 60_000);
+    return () => {
+      alive = false;
+      window.removeEventListener('focus', check);
+      clearInterval(interval);
+    };
+  }, [printerId, currentFile]);
 
   const status = state?.status ?? 'UNKNOWN';
   const progress = state?.progressPct ?? 0;
