@@ -46,38 +46,6 @@ function project(x: number, y: number): [number, number] {
   return [x, -y];
 }
 
-/**
- * Convex hull 2D via Andrew's monotone chain. O(n log n).
- * Usado pra extrair a silhueta externa de cada camada — gcode tem
- * paths super fragmentados (perímetros + infill), pegar o contorno
- * convexo resolve a renderização sólida sem precisar isolar
- * perímetros individuais.
- */
-function convexHull(pts: number[][]): number[][] {
-  if (pts.length < 3) return pts.slice();
-  const sorted = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const cross = (o: number[], a: number[], b: number[]): number =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const lower: number[][] = [];
-  for (const p of sorted) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop();
-    }
-    lower.push(p);
-  }
-  const upper: number[][] = [];
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const p = sorted[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop();
-    }
-    upper.push(p);
-  }
-  lower.pop();
-  upper.pop();
-  return [...lower, ...upper];
-}
-
 // Z projetado em pixels — adaptativo ao extent XY pra que prints
 // curtos (ex. chaveiro 2mm) ainda pareçam 3D, e prints altos não
 // estourem a tela.
@@ -386,35 +354,31 @@ function LayerSvg({
     let maxSY = Number.NEGATIVE_INFINITY;
 
     const layerSvgs = data.layers.map((layer) => {
-      // Coleta todos os pontos da camada (perímetros + infill).
-      const allPts: number[][] = [];
+      // Concatena todos os paths num único path SVG por camada
+      // (não dá pra fazer hull único pq prints multi-cópia ficam um
+      // octógono gigante; preservar paths individuais mantém todas
+      // as cópias visíveis).
+      const segments: string[] = [];
       for (const poly of layer.paths) {
         const pts = poly.points;
         if (!pts || pts.length === 0) continue;
-        for (const pt of pts) {
-          if (pt && pt.length >= 2) {
-            const [sx, sy] = project(pt[0], pt[1]);
-            if (sx < minSX) minSX = sx;
-            if (sx > maxSX) maxSX = sx;
-            if (sy < minSY) minSY = sy;
-            if (sy > maxSY) maxSY = sy;
-            allPts.push([sx, sy]);
-          }
+        const [fx, fy] = project(pts[0][0], pts[0][1]);
+        if (fx < minSX) minSX = fx;
+        if (fx > maxSX) maxSX = fx;
+        if (fy < minSY) minSY = fy;
+        if (fy > maxSY) maxSY = fy;
+        let segment = `M${fx.toFixed(1)},${fy.toFixed(1)}`;
+        for (let i = 1; i < pts.length; i++) {
+          const [sx, sy] = project(pts[i][0], pts[i][1]);
+          if (sx < minSX) minSX = sx;
+          if (sx > maxSX) maxSX = sx;
+          if (sy < minSY) minSY = sy;
+          if (sy > maxSY) maxSY = sy;
+          segment += `L${sx.toFixed(1)},${sy.toFixed(1)}`;
         }
+        segments.push(segment);
       }
-      if (allPts.length < 3) return { z: layer.z, hullD: '' };
-
-      // Convex hull da silhueta externa — sólida e limpa.
-      const hull = convexHull(allPts);
-      if (hull.length < 3) return { z: layer.z, hullD: '' };
-
-      let hullD = `M${hull[0][0].toFixed(1)},${hull[0][1].toFixed(1)}`;
-      for (let i = 1; i < hull.length; i++) {
-        hullD += `L${hull[i][0].toFixed(1)},${hull[i][1].toFixed(1)}`;
-      }
-      hullD += 'Z';
-
-      return { z: layer.z, hullD };
+      return { z: layer.z, d: segments.join(' ') };
     });
 
     if (!Number.isFinite(minSX)) {
@@ -490,17 +454,10 @@ function LayerSvg({
           pointer-events: none;
           transition: opacity 300ms ease;
         }
-        /* Done/Active = fill sólido, sem outline */
-        .lyr-done-${idSuffix} .hull-fill,
-        .lyr-active-${idSuffix} .hull-fill,
-        .lyr-preview-${idSuffix} .hull-fill { opacity: 0.92; }
-        .lyr-active-${idSuffix} .hull-fill { opacity: 1; }
-        .lyr-done-${idSuffix} .hull-stroke,
-        .lyr-active-${idSuffix} .hull-stroke,
-        .lyr-preview-${idSuffix} .hull-stroke { opacity: 0; }
-        /* Future = só outline visível, ghost em destaque */
-        .lyr-future-${idSuffix} .hull-fill { opacity: 0; }
-        .lyr-future-${idSuffix} .hull-stroke { opacity: 0.45; }
+        .lyr-done-${idSuffix}    { opacity: 0.95; }
+        .lyr-active-${idSuffix}  { opacity: 1; }
+        .lyr-future-${idSuffix}  { opacity: 0.35; }
+        .lyr-preview-${idSuffix} { opacity: 0.7; }
       `}</style>
 
       <div className={`lyr-stage-${idSuffix}`}>
@@ -522,26 +479,16 @@ function LayerSvg({
                 preserveAspectRatio="xMidYMid meet"
                 className="absolute inset-0 h-full w-full"
               >
-                {layer.hullD ? (
-                  <>
-                    {/* Fill — visível em done/active, sólido */}
-                    <path
-                      className="hull-fill"
-                      d={layer.hullD}
-                      fill={isActive ? '#ffffff' : fallbackColor}
-                      stroke="none"
-                    />
-                    {/* Stroke — visível em future, ghost em destaque */}
-                    <path
-                      className="hull-stroke"
-                      d={layer.hullD}
-                      fill="none"
-                      stroke={fallbackColor}
-                      strokeWidth={1.2}
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </>
+                {layer.d ? (
+                  <path
+                    d={layer.d}
+                    fill="none"
+                    stroke={isActive ? '#ffffff' : fallbackColor}
+                    strokeWidth={isActive ? 1.4 : 0.7}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
                 ) : null}
               </svg>
             </div>
