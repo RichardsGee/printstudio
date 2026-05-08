@@ -29,7 +29,11 @@ function getDb() {
 
 const nextAuthResult: NextAuthResult = NextAuth({
   secret: process.env.AUTH_SECRET,
-  session: { strategy: 'jwt' },
+  // 30 dias explícitos — o kiosk em monitor/tablet de oficina não
+  // pode reautenticar sozinho; sessão precisa durar o suficiente
+  // pra abranger semanas sem interação.
+  session: { strategy: 'jwt', maxAge: 60 * 60 * 24 * 30 },
+  jwt: { maxAge: 60 * 60 * 24 * 30 },
   pages: { signIn: '/login' },
   providers: [
     Credentials({
