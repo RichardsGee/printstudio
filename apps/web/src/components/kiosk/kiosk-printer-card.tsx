@@ -158,12 +158,9 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/bambu-a1.png"
-              alt="Bambu Lab A1"
-              className={cn(
-                'max-h-full max-w-full object-contain p-2 transition-[filter] duration-300',
-                sketchMode && 'kiosk-printer-sketch',
-              )}
+              src={sketchMode ? '/images/bambu-a1-blueprint.png' : '/images/bambu-a1.png'}
+              alt={sketchMode ? 'Bambu Lab A1 (blueprint)' : 'Bambu Lab A1'}
+              className="max-h-full max-w-full object-contain p-2 transition-opacity duration-300"
               draggable={false}
             />
             <div

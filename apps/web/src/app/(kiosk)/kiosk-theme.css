@@ -212,20 +212,3 @@
   letter-spacing: 0.05em;
 }
 
-/* Sketch / blueprint mode da impressora — converte PNG em desenho
-   técnico estilo plant a esquemática naval/aeroespacial. Inversão
-   pra criar linhas claras sobre fundo escuro, sépia + hue-rotate
-   pra cyan, contraste alto pra emphasis nos contornos. */
-.kiosk-mission .kiosk-printer-sketch {
-  filter:
-    contrast(1.4)
-    brightness(1.15)
-    invert(1)
-    grayscale(0.85)
-    sepia(0.6)
-    hue-rotate(155deg)
-    saturate(2.5)
-    drop-shadow(0 0 4px rgba(34, 211, 238, 0.4));
-  mix-blend-mode: screen;
-  transition: filter 280ms ease;
-}
