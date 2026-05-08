@@ -56,8 +56,12 @@ interface SceneRefs {
   printedMaterial: THREE.MeshStandardMaterial;
   ghostMaterial: THREE.MeshStandardMaterial;
   ringMesh: THREE.Mesh;
+  ringMaterial: THREE.MeshBasicMaterial;
   energyMesh: THREE.Mesh;
+  energyMaterial: THREE.MeshBasicMaterial;
   energyTexture: THREE.CanvasTexture;
+  haloMesh: THREE.Mesh;
+  haloMaterial: THREE.MeshBasicMaterial;
   belowPlane: THREE.Plane;
   abovePlane: THREE.Plane;
   meshHeight: number;
@@ -98,30 +102,49 @@ function applyViewAngle(
   camera.updateProjectionMatrix();
 }
 
-/** Cria uma textura vertical de UMA listra que nasce em baixo, sobe
- *  e some no topo. Ao repetir (RepeatWrapping), nasce outra embaixo
- *  quando a anterior some — efeito de "carga" cíclica.
- *
- *  Gradient: alpha=0 nas bordas, peak no meio. Quando a textura é
- *  rolada com `offset.y`, cada ciclo é uma listra completa nascendo
- *  → subindo → fadeout no topo. */
+/** Textura "data-stream" — 3 listras verticais em diferentes posições
+ *  X, cada uma com brilho passando por alturas diferentes. Quando a
+ *  textura rola em Y, cria efeito de parallax/dados subindo na parede
+ *  do cilindro. Plus tick marks horizontais sutis tipo escala HUD. */
 function createEnergyTexture(): THREE.CanvasTexture {
+  const W = 32;
+  const H = 512;
   const canvas = document.createElement('canvas');
-  canvas.width = 4;
-  canvas.height = 256;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d')!;
-  const grad = ctx.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0.0, 'rgba(255,255,255,0.0)');
-  grad.addColorStop(0.35, 'rgba(255,255,255,0.0)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.95)');
-  grad.addColorStop(0.65, 'rgba(255,255,255,0.0)');
-  grad.addColorStop(1.0, 'rgba(255,255,255,0.0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 4, 256);
+
+  // Fundo sutil — não totalmente transparente pra dar leve presença
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Tick marks horizontais (escala HUD)
+  for (let y = 0; y < H; y += 32) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fillRect(0, y, W, 1);
+  }
+
+  // 3 listras verticais em posições X distintas, com peaks de brilho
+  // em alturas diferentes (256/3 = ~170 entre peaks). Quando escrola,
+  // cria parallax visual.
+  const lanes: Array<{ x: number; w: number; peakY: number; intensity: number }> = [
+    { x: 5, w: 2, peakY: 80, intensity: 0.95 },
+    { x: 14, w: 4, peakY: 240, intensity: 1.0 },
+    { x: 24, w: 2, peakY: 400, intensity: 0.85 },
+  ];
+
+  for (const lane of lanes) {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(Math.max(0, (lane.peakY - 80) / H), 'rgba(255,255,255,0.0)');
+    grad.addColorStop(lane.peakY / H, `rgba(255,255,255,${lane.intensity})`);
+    grad.addColorStop(Math.min(1, (lane.peakY + 80) / H), 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(lane.x, 0, lane.w, H);
+  }
+
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  // 1 ciclo visível = 1 listra subindo por vez.
   tex.repeat.set(1, 1);
   return tex;
 }
@@ -346,6 +369,29 @@ export function RealisticPreview3D({
     energyMesh.scale.y = 0.001;
     group.add(energyMesh);
 
+    // Halo externo — cilindro maior, sem textura, opacity bem baixa.
+    // Dá o glow ao redor da energia (efeito de campo de força).
+    const haloGeo = new THREE.CylinderGeometry(
+      footprintRadius * 1.35,
+      footprintRadius * 1.35,
+      1,
+      48,
+      1,
+      true,
+    );
+    haloGeo.translate(0, 0.5, 0);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: themeColor,
+      transparent: true,
+      opacity: 0.12,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+    haloMesh.scale.y = 0.001;
+    group.add(haloMesh);
+
     scene.add(group);
 
     const floorGeo = new THREE.CircleGeometry(meshRadius * 1.6, 64);
@@ -362,8 +408,10 @@ export function RealisticPreview3D({
 
     const refs: SceneRefs = {
       renderer, scene, camera, group,
-      printedMaterial, ghostMaterial, ringMesh,
-      energyMesh, energyTexture,
+      printedMaterial, ghostMaterial,
+      ringMesh, ringMaterial: ringMat,
+      energyMesh, energyMaterial: energyMat, energyTexture,
+      haloMesh, haloMaterial: haloMat,
       belowPlane, abovePlane, meshHeight, meshRadius,
       dist, centerY: frameCenterY, rafId: null,
     };
@@ -388,6 +436,14 @@ export function RealisticPreview3D({
       group.rotation.y += dt * 0.14;
       energyTexture.offset.y -= dt * 0.4;
 
+      // Pulse de respiração: sin wave 0..1 com período de 2.4s.
+      // Modula opacity da energia, do halo e do ring pra dar
+      // sensação de "alimentando" a peça.
+      const pulse = (Math.sin((now / 1000) * (Math.PI * 2 / 2.4)) + 1) / 2;
+      energyMat.opacity = 0.42 + pulse * 0.18;
+      haloMat.opacity = 0.05 + pulse * 0.12;
+      ringMat.opacity = 0.78 + pulse * 0.22;
+
       renderer.render(scene, camera);
       refs.rafId = requestAnimationFrame(tick);
     };
@@ -407,6 +463,8 @@ export function RealisticPreview3D({
       energyMat.dispose();
       energyGeo.dispose();
       energyTexture.dispose();
+      haloMat.dispose();
+      haloGeo.dispose();
       geometry.dispose();
       renderer.dispose();
       try { container.removeChild(renderer.domElement); } catch { /* */ }
@@ -454,6 +512,8 @@ export function RealisticPreview3D({
     const minEnergyHeight = Math.max(refs.meshHeight * 0.15, 5);
     refs.energyMesh.scale.y = Math.max(clipY, minEnergyHeight);
     refs.energyMesh.visible = progress > 0 && progress < 1;
+    refs.haloMesh.scale.y = Math.max(clipY, minEnergyHeight);
+    refs.haloMesh.visible = progress > 0 && progress < 1;
   }, [currentLayer, totalLayers, progressPct, mesh]);
 
   function cycleViewAngle(e: React.MouseEvent): void {
