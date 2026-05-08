@@ -14,11 +14,11 @@ import {
   Layers,
 } from 'lucide-react';
 import type { PrinterState, PrinterStatus } from '@printstudio/shared';
-import { FilamentSwatch } from '@/components/filament-swatch';
 import { Spool } from '@/components/spool';
 import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
 import { RealisticPreview3D } from '@/components/realistic-preview-3d';
 import { MissionGauge } from '@/components/kiosk/mission-gauge';
+import { SensorPanel } from '@/components/kiosk/sensor-panel';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
 
 import { getBridgeBase } from '@/lib/bridge-url';
@@ -162,19 +162,11 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
             </div>
           </Link>
 
-          {/* Spool ocupa o espaço sobrando até a altura do slot do
-              objeto. Cresce com a viewport. */}
-          {printing && activeSlot ? (
-            <div className="flex-1 min-h-0 flex items-center justify-center px-1">
-              <div className="aspect-square h-full max-w-full">
-                <Spool
-                  color={activeSlot.color ?? null}
-                  active
-                  rotating
-                  size="100%"
-                  className="!w-full !h-full !block"
-                />
-              </div>
+          {/* Painel de sensores no espaço sobrando — telemetria
+              técnica (temps, fans, link) com gauges segmentados */}
+          {printing ? (
+            <div className="flex-1 min-h-0 flex items-stretch justify-center pt-1">
+              <SensorPanel state={state} className="w-full" />
             </div>
           ) : null}
         </div>
@@ -211,10 +203,12 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
         <div className="flex items-center justify-between gap-3">
           {activeSlot ? (
             <div className="flex items-center gap-2 min-w-0">
-              <FilamentSwatch
+              <Spool
                 color={activeSlot.color ?? null}
-                active={!!activeSlot}
-                size="md"
+                active
+                rotating={status === 'PRINTING'}
+                size={36}
+                className="shrink-0"
               />
               <div className="min-w-0">
                 <div
