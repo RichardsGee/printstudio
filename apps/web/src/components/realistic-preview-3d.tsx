@@ -41,6 +41,13 @@ interface Props {
   className?: string;
 }
 
+interface HeatRipple {
+  mesh: THREE.Mesh;
+  material: THREE.MeshBasicMaterial;
+  phase: number;
+  baseRadius: number;
+}
+
 interface SceneRefs {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -51,6 +58,7 @@ interface SceneRefs {
   ringMesh: THREE.Mesh;
   energyMesh: THREE.Mesh;
   energyTexture: THREE.CanvasTexture;
+  heatRipples: HeatRipple[];
   belowPlane: THREE.Plane;
   abovePlane: THREE.Plane;
   meshHeight: number;
@@ -240,7 +248,6 @@ export function RealisticPreview3D({
     geometry.computeBoundingSphere();
     const meshHeight = bbox.max.y - bbox.min.y;
     const meshRadius = geometry.boundingSphere!.radius;
-    const centerY = meshHeight / 2;
     // Raio do footprint XZ (chão) — diferente do meshRadius que
     // inclui altura. Usado pro cilindro de energia ficar do tamanho
     // da BASE do objeto, não da bounding sphere (que pra objetos
@@ -249,11 +256,24 @@ export function RealisticPreview3D({
     const fz = Math.max(Math.abs(bbox.min.z), Math.abs(bbox.max.z));
     const footprintRadius = Math.sqrt(fx * fx + fz * fz);
 
+    // Padroniza o enquadramento usando as bordas do CILINDRO DE ENERGIA
+    // (frame externo) em vez do mesh do objeto. Resultado: todos os
+    // prints aparecem com o mesmo "respiro" visual no card,
+    // independente da forma/altura específica do objeto. O meshRadius
+    // continua sendo usado pra definir o cilindro mas a câmera sai
+    // posicionada com base no frame.
+    const frameRadius = footprintRadius * 1.35;
+    const frameHeight = Math.max(meshHeight, footprintRadius * 1.5);
+    const frameRadiusFor3D = Math.sqrt(
+      frameRadius * frameRadius + (frameHeight / 2) * (frameHeight / 2),
+    );
+
     const aspect = initialW / Math.max(1, initialH);
-    const distH = meshRadius / Math.tan((35 * Math.PI) / 360);
+    const distH = frameRadiusFor3D / Math.tan((35 * Math.PI) / 360);
     const distW = distH / aspect;
-    const dist = Math.max(distH, distW) * 1.4;
-    applyViewAngle(camera, viewAngle, dist, centerY);
+    const dist = Math.max(distH, distW) * 1.25;
+    const frameCenterY = frameHeight / 2;
+    applyViewAngle(camera, viewAngle, dist, frameCenterY);
 
     const belowPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     const abovePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -319,6 +339,31 @@ export function RealisticPreview3D({
     energyMesh.scale.y = 0.001;
     group.add(energyMesh);
 
+    // Ondas de calor — 3 anéis horizontais que expandem e desvanecem
+    // em loop, dando a sensação de vapor/distorção saindo do print.
+    const heatRipples: HeatRipple[] = [];
+    const baseRippleR = footprintRadius * 1.0;
+    for (let i = 0; i < 3; i++) {
+      const rGeo = new THREE.RingGeometry(baseRippleR * 0.95, baseRippleR, 64);
+      const rMat = new THREE.MeshBasicMaterial({
+        color: baseColor,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const r = new THREE.Mesh(rGeo, rMat);
+      r.rotation.x = -Math.PI / 2;
+      group.add(r);
+      heatRipples.push({
+        mesh: r,
+        material: rMat,
+        phase: i / 3,
+        baseRadius: baseRippleR,
+      });
+    }
+
     scene.add(group);
 
     const floorGeo = new THREE.CircleGeometry(meshRadius * 1.6, 64);
@@ -336,9 +381,9 @@ export function RealisticPreview3D({
     const refs: SceneRefs = {
       renderer, scene, camera, group,
       printedMaterial, ghostMaterial, ringMesh,
-      energyMesh, energyTexture,
+      energyMesh, energyTexture, heatRipples,
       belowPlane, abovePlane, meshHeight, meshRadius,
-      dist, centerY, rafId: null,
+      dist, centerY: frameCenterY, rafId: null,
     };
     sceneRef.current = refs;
 
@@ -359,10 +404,19 @@ export function RealisticPreview3D({
       const dt = (now - lastFrame) / 1000;
       lastFrame = now;
       group.rotation.y += dt * 0.14;
-      // Listra de energia sobe (texture offset vai pra baixo no UV
-      // pra que visualmente a listra se mova pra cima). 0.4 = ciclo
-      // de ~2.5s — uma listra sobe, some no topo, nasce outra embaixo.
       energyTexture.offset.y -= dt * 0.4;
+
+      // Ondas de calor: ciclo de 3s, expansão de 1x → 1.6x raio com
+      // fadeout. Phases distribuídas pra parecerem assíncronas.
+      const tSec = now / 1000;
+      for (const rip of heatRipples) {
+        const cycle = ((tSec * 0.33 + rip.phase) % 1); // 0..1
+        const expand = 1 + cycle * 0.6;
+        const opacity = (1 - cycle) * 0.35;
+        rip.mesh.scale.set(expand, 1, expand);
+        rip.material.opacity = opacity;
+      }
+
       renderer.render(scene, camera);
       refs.rafId = requestAnimationFrame(tick);
     };
@@ -382,6 +436,10 @@ export function RealisticPreview3D({
       energyMat.dispose();
       energyGeo.dispose();
       energyTexture.dispose();
+      for (const rip of heatRipples) {
+        rip.mesh.geometry.dispose();
+        rip.material.dispose();
+      }
       geometry.dispose();
       renderer.dispose();
       try { container.removeChild(renderer.domElement); } catch { /* */ }
@@ -429,6 +487,14 @@ export function RealisticPreview3D({
     const minEnergyHeight = Math.max(refs.meshHeight * 0.15, 5);
     refs.energyMesh.scale.y = Math.max(clipY, minEnergyHeight);
     refs.energyMesh.visible = progress > 0 && progress < 1;
+
+    // Heat ripples emanam da altura atual do print head — sobem com
+    // a impressão, sempre visíveis enquanto o print rola.
+    const ripplesVisible = progress > 0 && progress < 1;
+    for (const rip of refs.heatRipples) {
+      rip.mesh.position.y = clipY;
+      rip.mesh.visible = ripplesVisible;
+    }
   }, [currentLayer, totalLayers, progressPct, mesh]);
 
   function cycleViewAngle(e: React.MouseEvent): void {
