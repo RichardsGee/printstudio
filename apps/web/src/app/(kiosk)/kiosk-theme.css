@@ -30,9 +30,22 @@
   background-position: 0 0;
   color: var(--mc-fg);
   position: relative;
+  /* TIPOGRAFIA — tudo monospace por padrão, exceto onde for sobrescrito.
+     Mantém canvas 3D e imagens intactos. */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  letter-spacing: 0.02em;
+  /* Boot fade-in quando a rota carrega */
+  animation: mc-boot 480ms ease-out;
 }
 
-/* Scanlines sutis fixas — efeito de monitor CRT antigo */
+@keyframes mc-boot {
+  0%   { opacity: 0; filter: brightness(0.4); }
+  60%  { opacity: 1; filter: brightness(1.2); }
+  100% { opacity: 1; filter: brightness(1); }
+}
+
+/* Scanlines sutis ANIMADAS — descem devagar simulando refresh de CRT.
+   Animação no background-position pra evitar reflow. */
 .kiosk-mission::before {
   content: '';
   position: fixed;
@@ -40,13 +53,19 @@
   pointer-events: none;
   background-image: repeating-linear-gradient(
     0deg,
-    rgba(255, 255, 255, 0.015) 0px,
-    rgba(255, 255, 255, 0.015) 1px,
+    rgba(255, 255, 255, 0.018) 0px,
+    rgba(255, 255, 255, 0.018) 1px,
     transparent 1px,
     transparent 3px
   );
   z-index: 50;
   mix-blend-mode: screen;
+  animation: mc-scanline-drift 6s linear infinite;
+}
+
+@keyframes mc-scanline-drift {
+  from { background-position: 0 0; }
+  to   { background-position: 0 24px; }
 }
 
 /* Vinheta sutil pra escurecer cantos */
@@ -151,3 +170,44 @@
 .kiosk-mission .border-primary { border-color: var(--mc-accent) !important; }
 .kiosk-mission .from-primary\/80 { --tw-gradient-from: rgba(34, 211, 238, 0.8) !important; }
 .kiosk-mission .to-primary { --tw-gradient-to: var(--mc-accent) !important; }
+
+/* Progress bar como gauge segmentado — substitui visual do
+   bg-gradient. 20 segmentos, lit conforme progresso. */
+.kiosk-mission [data-mc-gauge] {
+  display: flex;
+  gap: 1px;
+  background: rgba(34, 211, 238, 0.08);
+  padding: 2px;
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+.kiosk-mission [data-mc-gauge-cell] {
+  flex: 1;
+  height: 100%;
+  background: rgba(34, 211, 238, 0.15);
+  transition: background 240ms ease, box-shadow 240ms ease;
+}
+
+.kiosk-mission [data-mc-gauge-cell].lit {
+  background: var(--mc-accent);
+  box-shadow: 0 0 4px var(--mc-accent), inset 0 0 2px rgba(255, 255, 255, 0.4);
+}
+
+/* Glitch sutil — disparado raramente em alguns elementos */
+.kiosk-mission [data-mc-glitch] {
+  animation: mc-glitch 14s steps(1, end) infinite;
+}
+
+@keyframes mc-glitch {
+  0%, 97%, 100%  { transform: translate(0, 0); filter: none; }
+  97.4%          { transform: translate(1px, 0); filter: hue-rotate(15deg); }
+  97.8%          { transform: translate(-1px, 1px); filter: hue-rotate(-15deg); }
+  98.2%          { transform: translate(0, -1px); filter: none; }
+}
+
+/* Numeric counter com font-feature pra tabular */
+.kiosk-mission [data-mc-num] {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  letter-spacing: 0.05em;
+}

@@ -40,6 +40,7 @@ export function KioskStatusBanner({ printers, states }: Props) {
   return (
     <div
       data-mc-banner
+      data-mc-glitch
       className={cn(
         'flex items-center justify-between gap-4 rounded-2xl border-2 px-5 py-3',
         BANNER_TONE[tone],
@@ -95,16 +96,18 @@ export function KioskStatusBanner({ printers, states }: Props) {
         <KioskFullscreenButton />
         <div className="text-right">
         <div
-          className="font-semibold tabular-nums leading-none"
+          data-mc-num
+          className="font-semibold leading-none"
           style={{ fontSize: 'clamp(1.5rem, 3vw, 2.5rem)' }}
         >
-          {now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          {now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
         </div>
         <div
-          className="text-muted-foreground capitalize"
-          style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
+          data-mc-id
+          className="text-muted-foreground"
+          style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}
         >
-          {now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' })}
+          UTC{getTzOffset(now)} · LAT -22.9068 · LON -43.1729
         </div>
         </div>
       </div>
@@ -112,20 +115,19 @@ export function KioskStatusBanner({ printers, states }: Props) {
   );
 }
 
+function getTzOffset(d: Date): string {
+  const off = -d.getTimezoneOffset() / 60;
+  const sign = off >= 0 ? '+' : '-';
+  return `${sign}${String(Math.abs(off)).padStart(2, '0')}:00`;
+}
+
 function useNow(): Date {
   const [now, setNow] = useState<Date>(() => new Date());
   useEffect(() => {
-    // Sincroniza tick com o minuto cheio pra evitar drift visual.
-    let interval: ReturnType<typeof setInterval> | null = null;
-    const initialDelay = 60_000 - (Date.now() % 60_000);
-    const timeout = setTimeout(() => {
-      setNow(new Date());
-      interval = setInterval(() => setNow(new Date()), 60_000);
-    }, initialDelay);
-    return () => {
-      clearTimeout(timeout);
-      if (interval) clearInterval(interval);
-    };
+    // Tick a cada segundo pro relógio em formato HH:MM:SS atualizar.
+    // Custo barato: o banner tá sempre montado e o re-render é leve.
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
   }, []);
   return now;
 }

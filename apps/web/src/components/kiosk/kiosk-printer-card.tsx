@@ -18,6 +18,7 @@ import { FilamentSwatch } from '@/components/filament-swatch';
 import { Spool } from '@/components/spool';
 import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
 import { RealisticPreview3D } from '@/components/realistic-preview-3d';
+import { MissionGauge } from '@/components/kiosk/mission-gauge';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
 
 import { getBridgeBase } from '@/lib/bridge-url';
@@ -262,15 +263,8 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           ) : null}
         </div>
 
-        {/* Progress bar */}
-        {printing ? (
-          <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
-            <div
-              className={cn('h-full rounded-full transition-all duration-500', TONE_BAR_CLASSES[tone])}
-              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-            />
-          </div>
-        ) : null}
+        {/* Progress bar — gauge segmentado estilo HUD */}
+        {printing ? <MissionGauge value={progress} /> : null}
 
         {/* Linha 2 (printing): ETA · Camada · Arquivo */}
         {printing ? (
@@ -292,9 +286,9 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
             >
               <Layers className="h-3.5 w-3.5" />
-              <span className="font-semibold text-foreground tabular-nums">
+              <span data-mc-num className="font-semibold text-foreground">
                 {state?.currentLayer != null && state?.totalLayers != null
-                  ? `${state.currentLayer}/${state.totalLayers}`
+                  ? `${String(state.currentLayer).padStart(String(state.totalLayers).length, '0')}/${state.totalLayers}`
                   : '—'}
               </span>
             </span>
@@ -374,14 +368,14 @@ function StatusIcon({ status }: { status: PrinterStatus }) {
 }
 
 const STATUS_LABELS: Record<PrinterStatus, string> = {
-  IDLE: 'Ociosa',
-  PREPARE: 'Preparando',
-  PRINTING: 'Imprimindo',
-  PAUSED: 'Pausada',
-  FINISH: 'Concluída',
-  FAILED: 'Falha',
-  OFFLINE: 'Offline',
-  UNKNOWN: 'Desconhecido',
+  IDLE: '[STBY]',
+  PREPARE: '[BOOT]',
+  PRINTING: '[ACTIVE]',
+  PAUSED: '[HOLD]',
+  FINISH: '[OK]',
+  FAILED: '[ERR]',
+  OFFLINE: '[NO-LINK]',
+  UNKNOWN: '[?]',
 };
 
 const STATUS_ICONS: Record<PrinterStatus, React.ElementType> = {
@@ -413,10 +407,3 @@ const TONE_HEADER_CLASSES: Record<Tone, string> = {
   muted: 'bg-muted/40 text-muted-foreground border-b border-border/40',
 };
 
-const TONE_BAR_CLASSES: Record<Tone, string> = {
-  danger: 'bg-gradient-to-r from-danger/80 to-danger',
-  warning: 'bg-gradient-to-r from-warning/80 to-warning',
-  info: 'bg-gradient-to-r from-primary/80 to-primary',
-  success: 'bg-gradient-to-r from-success/80 to-success',
-  muted: 'bg-muted',
-};
