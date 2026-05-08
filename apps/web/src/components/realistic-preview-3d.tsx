@@ -2,10 +2,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Box, Loader2 } from 'lucide-react';
+import { Box, Loader2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { getBridgeBase } from '@/lib/bridge-url';
+
+type ViewAngle = 'front' | 'iso' | 'top';
+
+const VIEW_LABELS: Record<ViewAngle, string> = {
+  front: 'Frontal',
+  iso: 'Isométrica',
+  top: 'Topo',
+};
+
+const VIEW_ORDER: ViewAngle[] = ['front', 'iso', 'top'];
 
 interface MeshPayload {
   fileName: string;
@@ -42,7 +52,40 @@ interface SceneRefs {
   abovePlane: THREE.Plane;
   meshHeight: number;
   meshRadius: number;
+  dist: number;
+  centerY: number;
   rafId: number | null;
+}
+
+/**
+ * Posiciona a câmera + lookAt baseado no ângulo escolhido. Mantém a
+ * distância calculada pelo bounding sphere — o que muda é só posição
+ * relativa e ponto pra onde olha.
+ */
+function applyViewAngle(
+  camera: THREE.PerspectiveCamera,
+  angle: ViewAngle,
+  dist: number,
+  centerY: number,
+): void {
+  switch (angle) {
+    case 'front':
+      // Eye-level com leve elevação — visão padrão.
+      camera.position.set(0, centerY * 1.1, dist);
+      camera.lookAt(0, centerY * 0.6, 0);
+      break;
+    case 'iso':
+      // Isométrica 3/4 — câmera elevada, ângulo de 45° no XZ.
+      camera.position.set(dist * 0.65, dist * 0.7, dist * 0.65);
+      camera.lookAt(0, centerY * 0.4, 0);
+      break;
+    case 'top':
+      // Topo (bird's eye) — pra ver o footprint da peça.
+      camera.position.set(0, dist * 1.3, 0.001);
+      camera.lookAt(0, 0, 0);
+      break;
+  }
+  camera.updateProjectionMatrix();
 }
 
 /** Cria uma textura vertical de UMA listra que nasce em baixo, sobe
@@ -91,6 +134,11 @@ export function RealisticPreview3D({
 }: Props) {
   const [mesh, setMesh] = useState<MeshPayload | null>(null);
   const [status, setStatus] = useState<'loading' | 'ok' | 'error' | 'no-model'>('loading');
+  const [viewAngle, setViewAngle] = useState<ViewAngle>(() => {
+    if (typeof window === 'undefined') return 'front';
+    const saved = window.localStorage.getItem('kiosk-view-angle');
+    return saved && (VIEW_ORDER as string[]).includes(saved) ? (saved as ViewAngle) : 'front';
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneRefs | null>(null);
 
@@ -197,14 +245,11 @@ export function RealisticPreview3D({
     const fz = Math.max(Math.abs(bbox.min.z), Math.abs(bbox.max.z));
     const footprintRadius = Math.sqrt(fx * fx + fz * fz);
 
-    // Distância da câmera com folga — modelo centralizado no frame
-    // sem ficar colado nas bordas, mas ainda dominante visualmente.
     const aspect = initialW / Math.max(1, initialH);
     const distH = meshRadius / Math.tan((35 * Math.PI) / 360);
     const distW = distH / aspect;
     const dist = Math.max(distH, distW) * 1.4;
-    camera.position.set(0, centerY * 1.1, dist);
-    camera.lookAt(0, centerY * 0.6, 0);
+    applyViewAngle(camera, viewAngle, dist, centerY);
 
     const belowPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     const abovePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -288,7 +333,8 @@ export function RealisticPreview3D({
       renderer, scene, camera, group,
       printedMaterial, ghostMaterial, ringMesh,
       energyMesh, energyTexture,
-      belowPlane, abovePlane, meshHeight, meshRadius, rafId: null,
+      belowPlane, abovePlane, meshHeight, meshRadius,
+      dist, centerY, rafId: null,
     };
     sceneRef.current = refs;
 
@@ -338,6 +384,13 @@ export function RealisticPreview3D({
     };
   }, [mesh, filamentColor]);
 
+  // Update camera quando o ângulo muda — sem recriar a cena inteira.
+  useEffect(() => {
+    const refs = sceneRef.current;
+    if (!refs) return;
+    applyViewAngle(refs.camera, viewAngle, refs.dist, refs.centerY);
+  }, [viewAngle, mesh]);
+
   // Update clipping plane sem recriar a cena.
   // Inclui `mesh` nas deps pra garantir que roda DEPOIS do scene
   // setup (que também depende de mesh) — sem isso, num refresh com
@@ -361,6 +414,15 @@ export function RealisticPreview3D({
     refs.energyMesh.visible = progress > 0 && progress < 1;
   }, [currentLayer, totalLayers, mesh]);
 
+  function cycleViewAngle(): void {
+    const idx = VIEW_ORDER.indexOf(viewAngle);
+    const next = VIEW_ORDER[(idx + 1) % VIEW_ORDER.length];
+    setViewAngle(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('kiosk-view-angle', next);
+    }
+  }
+
   return (
     <div
       className={cn(
@@ -369,6 +431,21 @@ export function RealisticPreview3D({
       )}
     >
       <div ref={containerRef} className="absolute inset-0" />
+
+      {status === 'ok' ? (
+        <button
+          type="button"
+          onClick={cycleViewAngle}
+          className="absolute top-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-md bg-background/80 backdrop-blur-sm border border-border/60 px-2 py-1 text-foreground hover:bg-background transition-colors"
+          aria-label={`Ângulo: ${VIEW_LABELS[viewAngle]} (clica pra trocar)`}
+          title={`Ângulo: ${VIEW_LABELS[viewAngle]}`}
+        >
+          <RotateCcw className="h-3 w-3" />
+          <span className="font-mono uppercase tracking-wider" style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}>
+            {VIEW_LABELS[viewAngle]}
+          </span>
+        </button>
+      ) : null}
 
       {status !== 'ok' ? (
         <div className="absolute inset-0 grid place-items-center text-muted-foreground bg-gradient-to-b from-[#0a0f1c] to-[#020409]">
