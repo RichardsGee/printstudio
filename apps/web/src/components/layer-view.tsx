@@ -503,10 +503,13 @@ function LayerSvg({
                       key={tool}
                       d={d}
                       stroke={isActive ? '#ffffff' : c}
-                      strokeWidth={isActive ? 1.2 : 0.6}
+                      // strokeWidth em pixels (constante em qualquer zoom/escala)
+                      // graças a vector-effect=non-scaling-stroke abaixo.
+                      strokeWidth={isActive ? 2.4 : 1.2}
                       fill="none"
                       strokeLinejoin="round"
                       strokeLinecap="round"
+                      vectorEffect="non-scaling-stroke"
                       style={{ color: c }}
                     />
                   );
