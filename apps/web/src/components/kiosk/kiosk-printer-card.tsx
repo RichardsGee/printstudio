@@ -123,48 +123,24 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           href={`/printers/${printerId}`}
           aria-label={`Detalhes da ${name}`}
           className={cn(
-            'relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex flex-col',
+            'relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex items-center justify-center',
             'transition-transform hover:scale-[1.02] active:scale-[0.98]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
         >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/bambu-a1.png"
+            alt="Bambu Lab A1"
+            className="max-h-full max-w-full object-contain p-2"
+            draggable={false}
+          />
           <div
-            className="absolute top-1.5 left-2 z-10 font-mono uppercase tracking-wider text-muted-foreground pointer-events-none"
+            className="absolute top-1.5 left-2 font-mono uppercase tracking-wider text-muted-foreground"
             style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}
           >
             A1 + AMS
           </div>
-
-          {/* Bambu A1 — ocupa o topo, deixando espaço pro spool+tubo */}
-          <div className="flex-1 min-h-0 flex items-center justify-center px-2 pt-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/bambu-a1.png"
-              alt="Bambu Lab A1"
-              className="max-h-full max-w-full object-contain"
-              draggable={false}
-            />
-          </div>
-
-          {/* Rolo de filamento + tubo PTFE saindo em direção ao 3D.
-              Tubo se estende até a borda direita pra dar a sensação
-              de continuidade visual com o card do objeto. */}
-          {printing && activeSlot ? (
-            <div className="flex items-center gap-1.5 px-2 pb-2 pr-0">
-              <Spool
-                color={activeSlot.color ?? null}
-                active
-                rotating
-                size={36}
-                className="shrink-0"
-              />
-              <PtfeTube
-                color={activeSlot.color ?? null}
-                active
-                className="flex-1 h-2.5"
-              />
-            </div>
-          ) : null}
         </Link>
 
         {printing ? (
@@ -191,6 +167,26 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           <IdleObjectPlaceholder status={status} />
         )}
       </div>
+
+      {/* Row separada abaixo do hero: rolo de filamento alimentando
+          o tubo PTFE que se estende até a área do objeto 3D — dá a
+          sensação visual de "filamento entrando no print". */}
+      {printing && activeSlot ? (
+        <div className="flex items-center gap-2 px-2.5 pb-2 -mt-1">
+          <Spool
+            color={activeSlot.color ?? null}
+            active
+            rotating
+            size={42}
+            className="shrink-0"
+          />
+          <PtfeTube
+            color={activeSlot.color ?? null}
+            active
+            className="flex-1 h-3"
+          />
+        </div>
+      ) : null}
 
       <div className="p-3 space-y-2.5">
         {/* Linha 1: filamento + progresso inline (só quando imprimindo) */}
