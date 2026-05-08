@@ -268,6 +268,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 cacheKey={state?.currentFile ?? null}
                 currentLayer={state?.currentLayer ?? null}
                 totalLayers={state?.totalLayers ?? null}
+                progressPct={state?.progressPct ?? null}
                 filamentColor={activeSlot?.color ?? null}
               />
 

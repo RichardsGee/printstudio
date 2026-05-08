@@ -34,6 +34,9 @@ interface Props {
   printerId: string;
   currentLayer?: number | null;
   totalLayers?: number | null;
+  /** Percentual 0-100 reportado pelo MQTT — usado como fallback
+   *  quando currentLayer ainda é 0 (primeira camada em andamento). */
+  progressPct?: number | null;
   filamentColor?: string | null;
   className?: string;
 }
@@ -129,6 +132,7 @@ export function RealisticPreview3D({
   printerId,
   currentLayer,
   totalLayers,
+  progressPct,
   filamentColor,
   className,
 }: Props) {
@@ -399,10 +403,18 @@ export function RealisticPreview3D({
   useEffect(() => {
     const refs = sceneRef.current;
     if (!refs) return;
-    const progress =
+    // Usa o MAIOR entre:
+    //   - currentLayer / totalLayers (precisão por camada quando avança)
+    //   - progressPct / 100 (cobertura inicial — a impressora reporta
+    //     currentLayer=0 durante toda a primeira camada, mas progressPct
+    //     já sai de 0 desde o início, então o cilindro nasce na hora).
+    const layerProgress =
       currentLayer != null && totalLayers != null && totalLayers > 0
-        ? Math.max(0, Math.min(1, currentLayer / totalLayers))
+        ? currentLayer / totalLayers
         : 0;
+    const pctProgress =
+      progressPct != null ? Math.max(0, Math.min(100, progressPct)) / 100 : 0;
+    const progress = Math.max(0, Math.min(1, Math.max(layerProgress, pctProgress)));
     const clipY = refs.meshHeight * progress;
     refs.belowPlane.constant = clipY;
     refs.abovePlane.constant = -clipY;
@@ -412,7 +424,7 @@ export function RealisticPreview3D({
     refs.printedMaterial.clippingPlanes = progress < 1 ? [refs.belowPlane] : [];
     refs.energyMesh.scale.y = Math.max(clipY, 0.001);
     refs.energyMesh.visible = progress > 0 && progress < 1;
-  }, [currentLayer, totalLayers, mesh]);
+  }, [currentLayer, totalLayers, progressPct, mesh]);
 
   function cycleViewAngle(): void {
     const idx = VIEW_ORDER.indexOf(viewAngle);

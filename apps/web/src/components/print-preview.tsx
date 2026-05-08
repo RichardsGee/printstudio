@@ -12,6 +12,7 @@ interface Props {
   cacheKey?: string | null;
   currentLayer?: number | null;
   totalLayers?: number | null;
+  progressPct?: number | null;
   filamentColor?: string | null;
   className?: string;
 }
@@ -30,6 +31,7 @@ export function PrintPreview({
   cacheKey,
   currentLayer,
   totalLayers,
+  progressPct,
   filamentColor,
   className,
 }: Props) {
@@ -73,6 +75,7 @@ export function PrintPreview({
           printerId={printerId}
           currentLayer={currentLayer}
           totalLayers={totalLayers}
+          progressPct={progressPct}
           filamentColor={filamentColor}
           className="aspect-square"
         />
