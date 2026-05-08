@@ -16,6 +16,7 @@ import type { CameraManager } from '../camera/manager.js';
 import type { ThumbnailManager } from '../ftp/thumbnail-manager.js';
 import type { LayersManager } from '../gcode/layers-manager.js';
 import type { ModelStore } from '../storage/model-store.js';
+import { extractPrimaryMesh } from '../storage/mesh-extractor.js';
 import type { Logger } from '../logger.js';
 
 interface ServerOpts {
@@ -122,6 +123,58 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
       const info = await models.info(req.params.id);
       if (!info) return reply.code(404).send({ error: 'no model uploaded' });
       return info;
+    },
+  );
+
+  // Mesh parseado do .3mf uploaded — pra render 3D realista no client.
+  // Cache simples em memória pra evitar re-parsear .3mf de 100MB+ a cada
+  // request: chave = printerId + uploadedAt.
+  const meshCache = new Map<string, { uploadedAt: number; payload: string }>();
+  app.get<{ Params: { id: string } }>(
+    '/api/printers/:id/uploaded-model.json',
+    async (req, reply) => {
+      const printerId = req.params.id;
+      const info = await models.info(printerId);
+      if (!info) return reply.code(404).send({ error: 'no model uploaded' });
+
+      const cached = meshCache.get(printerId);
+      let payload: string;
+      if (cached && cached.uploadedAt === info.uploadedAt) {
+        payload = cached.payload;
+      } else {
+        const buf = await models.load(printerId);
+        if (!buf) return reply.code(404).send({ error: 'model file missing' });
+        const t0 = Date.now();
+        const mesh = extractPrimaryMesh(buf);
+        if (!mesh) {
+          return reply.code(422).send({
+            error: 'mesh not found in .3mf — file may be invalid or sliced-only',
+          });
+        }
+        logger.info(
+          {
+            printerId,
+            triangles: mesh.triangleCount,
+            vertices: mesh.vertexCount,
+            parseMs: Date.now() - t0,
+          },
+          'mesh: extracted from uploaded .3mf',
+        );
+        payload = JSON.stringify({ ...mesh, fileName: info.originalName });
+        meshCache.set(printerId, { uploadedAt: info.uploadedAt, payload });
+      }
+
+      const acceptsGzip = /gzip/i.test(String(req.headers['accept-encoding'] ?? ''));
+      reply
+        .type('application/json')
+        .header('Cache-Control', 'no-store')
+        .header('Access-Control-Allow-Origin', '*');
+      if (acceptsGzip) {
+        reply.header('Content-Encoding', 'gzip').send(gzipSync(payload));
+      } else {
+        reply.send(payload);
+      }
+      return reply;
     },
   );
 

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Image as ImageIcon, Box } from 'lucide-react';
+import { Image as ImageIcon, Box, Sparkles } from 'lucide-react';
 import { ThumbnailPreview } from './thumbnail-preview';
 import { LayerView } from './layer-view';
+import { RealisticPreview3D } from './realistic-preview-3d';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -15,13 +16,14 @@ interface Props {
   className?: string;
 }
 
-type Mode = 'thumbnail' | 'layers';
+type Mode = 'thumbnail' | 'layers' | 'realistic';
 
 /**
- * Preview do trabalho atual — alterna entre o thumbnail renderizado
- * pelo Bambu Studio (default) e a visualização 3D das camadas feita
- * por nós a partir do gcode. Thumbnail é default porque é leve e
- * familiar; 3D é opt-in pra quem quer ver o progresso camada a camada.
+ * Preview do trabalho atual — três modos:
+ *  - Foto: thumbnail PNG renderizado pelo Bambu Studio
+ *  - Fatias: toolpaths empilhados em isométrico (do gcode)
+ *  - Real: render 3D do mesh do .3mf que o usuário subiu, com
+ *    clipping plane que sobe conforme as camadas avançam
  */
 export function PrintPreview({
   printerId,
@@ -35,7 +37,6 @@ export function PrintPreview({
 
   return (
     <div className={cn('relative', className)}>
-      {/* Toggle no topo */}
       <div className="absolute top-1.5 left-1.5 z-10 flex rounded-md bg-background/75 backdrop-blur border border-border/60 p-0.5 text-[10px] font-mono">
         <ModeButton
           active={mode === 'thumbnail'}
@@ -47,19 +48,33 @@ export function PrintPreview({
           active={mode === 'layers'}
           onClick={() => setMode('layers')}
           icon={Box}
-          label="3D"
+          label="Fatias"
+        />
+        <ModeButton
+          active={mode === 'realistic'}
+          onClick={() => setMode('realistic')}
+          icon={Sparkles}
+          label="Real"
         />
       </div>
 
       {mode === 'thumbnail' ? (
         <ThumbnailPreview printerId={printerId} cacheKey={cacheKey} />
-      ) : (
+      ) : mode === 'layers' ? (
         <LayerView
           printerId={printerId}
           cacheKey={cacheKey}
           currentLayer={currentLayer}
           totalLayers={totalLayers}
           filamentColor={filamentColor}
+        />
+      ) : (
+        <RealisticPreview3D
+          printerId={printerId}
+          currentLayer={currentLayer}
+          totalLayers={totalLayers}
+          filamentColor={filamentColor}
+          className="aspect-square"
         />
       )}
     </div>
