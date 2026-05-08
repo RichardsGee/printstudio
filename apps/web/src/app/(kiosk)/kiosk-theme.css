@@ -212,3 +212,8 @@
   letter-spacing: 0.05em;
 }
 
+/* Blueprint cyan tint — gira o azul do PNG pro cyan do tema. */
+.kiosk-mission .kiosk-blueprint-tint {
+  filter: hue-rotate(-22deg) saturate(1.3) brightness(1.05);
+}
+

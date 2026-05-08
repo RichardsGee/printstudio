@@ -15,6 +15,10 @@ export interface MeshData {
   };
   vertexCount: number;
   triangleCount: number;
+  /** Quantidade de instâncias do modelo no .3mf — `<item>` no `<build>`.
+   *  Geralmente 1 (single print) mas N quando o usuário arranjou
+   *  múltiplas cópias na mesa do slicer. */
+  instanceCount: number;
 }
 
 /**
@@ -43,16 +47,41 @@ export function extractPrimaryMesh(threeMfBuf: Buffer): MeshData | null {
 
     if (modelEntries.length === 0) return null;
 
+    // Conta instâncias agregando `<item>` em todos os arquivos de modelo
+    // (Production Extension pode espalhar `<build>` entre files).
+    let totalInstances = 0;
+    for (const entry of modelEntries) {
+      const xml = entry.getData().toString('utf8');
+      totalInstances += countBuildItems(xml);
+    }
+
     for (const entry of modelEntries) {
       const xml = entry.getData().toString('utf8');
       const mesh = parseFirstMeshFromXml(xml);
-      if (mesh && mesh.triangleCount > 0) return mesh;
+      if (mesh && mesh.triangleCount > 0) {
+        mesh.instanceCount = Math.max(1, totalInstances);
+        return mesh;
+      }
     }
 
     return null;
   } catch {
     return null;
   }
+}
+
+/** Conta `<item>` dentro de blocos `<build>` (cada item = 1 cópia
+ *  do modelo na mesa do slicer). */
+function countBuildItems(xml: string): number {
+  const buildRe = /<build\b[^>]*>([\s\S]*?)<\/build>/g;
+  let total = 0;
+  let m: RegExpExecArray | null;
+  while ((m = buildRe.exec(xml)) !== null) {
+    const inner = m[1];
+    const items = inner.match(/<item\b/g);
+    if (items) total += items.length;
+  }
+  return total;
 }
 
 function parseFirstMeshFromXml(xml: string): MeshData | null {
@@ -111,6 +140,7 @@ function parseMeshBlock(meshXml: string): MeshData | null {
     bounds: { minX, maxX, minY, maxY, minZ, maxZ },
     vertexCount: vertices.length / 3,
     triangleCount: indices.length / 3,
+    instanceCount: 1, // populado depois pelo caller agregando `<build>` de todos modelos
   };
 }
 

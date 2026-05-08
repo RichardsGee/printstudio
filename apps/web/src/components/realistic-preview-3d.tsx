@@ -28,6 +28,7 @@ interface MeshPayload {
   };
   vertexCount: number;
   triangleCount: number;
+  instanceCount?: number;
 }
 
 interface Props {
@@ -518,6 +519,25 @@ export function RealisticPreview3D({
           </span>
           <span className="ml-2 text-xs font-semibold text-primary">
             {Math.round((currentLayer / totalLayers) * 100)}%
+          </span>
+        </div>
+      ) : null}
+
+      {/* Badge de quantidade de cópias — quando o .3mf tem mais de 1
+          instância. Mostrado top-center, estilo "×10" Mission Mode. */}
+      {status === 'ok' && mesh?.instanceCount && mesh.instanceCount > 1 ? (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-[var(--mc-accent,#22d3ee)] px-2 py-0.5 font-mono tabular-nums text-foreground pointer-events-none">
+          <span
+            className="text-[var(--mc-accent,#22d3ee)] font-bold"
+            style={{ fontSize: 'clamp(0.875rem, 1.6vw, 1.125rem)' }}
+          >
+            ×{mesh.instanceCount}
+          </span>
+          <span
+            className="text-muted-foreground uppercase tracking-wider"
+            style={{ fontSize: 'clamp(0.5rem, 0.75vw, 0.625rem)' }}
+          >
+            UNITS
           </span>
         </div>
       ) : null}
