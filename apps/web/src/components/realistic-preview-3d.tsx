@@ -46,27 +46,31 @@ interface SceneRefs {
   rafId: number | null;
 }
 
-/** Cria uma textura vertical de listras pra ser animada subindo na
- *  parede do cilindro de "energia". 4×256px é suficiente. */
+/** Cria uma textura vertical de UMA listra que nasce em baixo, sobe
+ *  e some no topo. Ao repetir (RepeatWrapping), nasce outra embaixo
+ *  quando a anterior some — efeito de "carga" cíclica.
+ *
+ *  Gradient: alpha=0 nas bordas, peak no meio. Quando a textura é
+ *  rolada com `offset.y`, cada ciclo é uma listra completa nascendo
+ *  → subindo → fadeout no topo. */
 function createEnergyTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 4;
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
   const grad = ctx.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0.0, 'rgba(255,255,255,0.85)');
-  grad.addColorStop(0.15, 'rgba(255,255,255,0.05)');
-  grad.addColorStop(0.35, 'rgba(255,255,255,0.6)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.05)');
-  grad.addColorStop(0.7, 'rgba(255,255,255,0.7)');
-  grad.addColorStop(0.85, 'rgba(255,255,255,0.05)');
-  grad.addColorStop(1.0, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(0.0, 'rgba(255,255,255,0.0)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.0)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.95)');
+  grad.addColorStop(0.65, 'rgba(255,255,255,0.0)');
+  grad.addColorStop(1.0, 'rgba(255,255,255,0.0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 4, 256);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(1, 2);
+  // 1 ciclo visível = 1 listra subindo por vez.
+  tex.repeat.set(1, 1);
   return tex;
 }
 
@@ -186,6 +190,13 @@ export function RealisticPreview3D({
     const meshHeight = bbox.max.y - bbox.min.y;
     const meshRadius = geometry.boundingSphere!.radius;
     const centerY = meshHeight / 2;
+    // Raio do footprint XZ (chão) — diferente do meshRadius que
+    // inclui altura. Usado pro cilindro de energia ficar do tamanho
+    // da BASE do objeto, não da bounding sphere (que pra objetos
+    // altos é bem maior que a base).
+    const fx = Math.max(Math.abs(bbox.min.x), Math.abs(bbox.max.x));
+    const fz = Math.max(Math.abs(bbox.min.z), Math.abs(bbox.max.z));
+    const footprintRadius = Math.sqrt(fx * fx + fz * fz);
 
     // Distância da câmera com folga — modelo centralizado no frame
     // sem ficar colado nas bordas, mas ainda dominante visualmente.
@@ -235,16 +246,15 @@ export function RealisticPreview3D({
     group.add(ringMesh);
 
     // Cilindro de "energia" subindo do chão — listras animadas que
-    // sobem na parede, altura proporcional ao progresso da impressão.
-    // Geometry com altura 1 e base em y=0 (translate up) — escalamos
-    // o Y conforme as camadas sobem.
+    // sobem na parede. Raio = footprint do objeto (não bounding
+    // sphere) pra não cortar topo de objetos altos.
     const energyGeo = new THREE.CylinderGeometry(
-      meshRadius * 1.05,
-      meshRadius * 1.05,
+      footprintRadius * 1.1,
+      footprintRadius * 1.1,
       1,
       48,
       1,
-      true, // open ends
+      true,
     );
     energyGeo.translate(0, 0.5, 0);
     const energyTexture = createEnergyTexture();
@@ -252,7 +262,7 @@ export function RealisticPreview3D({
       map: energyTexture,
       color: baseColor,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.5,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       depthWrite: false,
@@ -300,9 +310,10 @@ export function RealisticPreview3D({
       const dt = (now - lastFrame) / 1000;
       lastFrame = now;
       group.rotation.y += dt * 0.14;
-      // Listras de energia sobem (texture offset vai pra baixo no UV
-      // pra que visualmente as listras se movam pra cima na cilindro).
-      energyTexture.offset.y -= dt * 0.6;
+      // Listra de energia sobe (texture offset vai pra baixo no UV
+      // pra que visualmente a listra se mova pra cima). 0.4 = ciclo
+      // de ~2.5s — uma listra sobe, some no topo, nasce outra embaixo.
+      energyTexture.offset.y -= dt * 0.4;
       renderer.render(scene, camera);
       refs.rafId = requestAnimationFrame(tick);
     };
