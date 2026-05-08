@@ -9,6 +9,8 @@ import { MdnsPublisher } from './mdns.js';
 import { CameraManager } from './camera/manager.js';
 import { ThumbnailManager } from './ftp/thumbnail-manager.js';
 import { LayersManager } from './gcode/layers-manager.js';
+import { ModelStore } from './storage/model-store.js';
+import { dirname, resolve } from 'node:path';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -35,11 +37,18 @@ async function main(): Promise<void> {
     layers.onState(state);
   });
 
+  // ModelStore guarda .3mf originais subidos pelo usuário pra render
+  // realista (já que o .3mf da impressora não tem mesh).
+  const modelsDir = resolve(dirname(config.env.BRIDGE_DB_PATH), 'models');
+  const models = new ModelStore(modelsDir);
+  await models.ensureDir();
+
   const server = await createServer({
     manager,
     cameras,
     thumbnails,
     layers,
+    models,
     logger,
     port: config.env.BRIDGE_PORT,
     bridgeId: config.env.BRIDGE_ID,

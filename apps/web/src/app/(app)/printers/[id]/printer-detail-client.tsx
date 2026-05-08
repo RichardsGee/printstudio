@@ -41,6 +41,7 @@ import { PtfeTube } from '@/components/ptfe-tube';
 import { PowerUsage } from '@/components/power-usage';
 import { FilamentUsage } from '@/components/filament-usage';
 import { FilamentTotal } from '@/components/filament-total';
+import { ModelLink } from '@/components/model-link';
 import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -186,7 +187,8 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             </div>
           ) : null}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <ModelLink printerId={printerId} />
           <Button size="sm" variant="outline" onClick={() => send('pause')}>
             <Pause className="h-4 w-4 mr-1.5" /> Pausar
           </Button>

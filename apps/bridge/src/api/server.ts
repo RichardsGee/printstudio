@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
+import multipart from '@fastify/multipart';
 import { randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import {
@@ -14,6 +15,7 @@ import type { MqttManager } from '../mqtt/manager.js';
 import type { CameraManager } from '../camera/manager.js';
 import type { ThumbnailManager } from '../ftp/thumbnail-manager.js';
 import type { LayersManager } from '../gcode/layers-manager.js';
+import type { ModelStore } from '../storage/model-store.js';
 import type { Logger } from '../logger.js';
 
 interface ServerOpts {
@@ -21,17 +23,20 @@ interface ServerOpts {
   cameras: CameraManager;
   thumbnails: ThumbnailManager;
   layers: LayersManager;
+  models: ModelStore;
   logger: Logger;
   port: number;
   bridgeId: string;
 }
 
 export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
-  const { manager, cameras, thumbnails, layers, logger, port, bridgeId } = opts;
+  const { manager, cameras, thumbnails, layers, models, logger, port, bridgeId } = opts;
 
   const app = Fastify({ logger: false });
   await app.register(cors, { origin: true });
   await app.register(fastifyWebsocket);
+  // Limit 200MB — .3mf grandes (modelos detalhados) podem ter 100MB+.
+  await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024 } });
 
   app.get('/api/health', async () => ({
     status: 'ok',
@@ -87,6 +92,48 @@ export async function createServer(opts: ServerOpts): Promise<FastifyInstance> {
     }
     return reply;
   });
+
+  // Upload de .3mf original (com mesh) pro render realista. Substitui
+  // qualquer arquivo previamente associado a essa impressora.
+  app.post<{ Params: { id: string } }>(
+    '/api/printers/:id/upload-model',
+    async (req, reply) => {
+      const file = await req.file();
+      if (!file) return reply.code(400).send({ error: 'no file in request' });
+      if (!/\.3mf$/i.test(file.filename ?? '')) {
+        return reply.code(400).send({ error: 'file must be .3mf' });
+      }
+      const buf = await file.toBuffer();
+      if (buf.length === 0) return reply.code(400).send({ error: 'empty file' });
+
+      const meta = await models.save(req.params.id, buf, file.filename);
+      logger.info(
+        { printerId: req.params.id, originalName: meta.originalName, sizeMB: (meta.size / 1024 / 1024).toFixed(1) },
+        'model uploaded',
+      );
+      return { ok: true, ...meta };
+    },
+  );
+
+  // Info do modelo associado (pra UI mostrar "vinculado" / "não vinculado").
+  app.get<{ Params: { id: string } }>(
+    '/api/printers/:id/uploaded-model.info',
+    async (req, reply) => {
+      const info = await models.info(req.params.id);
+      if (!info) return reply.code(404).send({ error: 'no model uploaded' });
+      return info;
+    },
+  );
+
+  // Remove o modelo associado.
+  app.delete<{ Params: { id: string } }>(
+    '/api/printers/:id/uploaded-model',
+    async (req) => {
+      await models.remove(req.params.id);
+      logger.info({ printerId: req.params.id }, 'model unbound');
+      return { ok: true };
+    },
+  );
 
   // Current print-job thumbnail extracted from the printer's `.3mf` via FTPS.
   // Quando o cliente passa `?file=`, só devolve se o cache bater com o
