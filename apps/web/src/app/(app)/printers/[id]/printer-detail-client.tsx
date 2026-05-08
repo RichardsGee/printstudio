@@ -5,11 +5,9 @@ import {
   Pause,
   Play,
   Square,
-  Clock,
   Thermometer,
   Flame,
   Wind,
-  FileText,
   HardDrive,
 } from 'lucide-react';
 import {
