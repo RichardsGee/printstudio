@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { getApiBase } from '@/lib/bridge-url';
 
 interface Props {
   printerId: string;
@@ -28,7 +28,7 @@ export function FilamentTotal({ printerId, refreshKey, className }: Props) {
 
   useEffect(() => {
     let alive = true;
-    fetch(`${API_URL}/api/stats?printerId=${printerId}`, { credentials: 'include' })
+    fetch(`${getApiBase()}/api/stats?printerId=${printerId}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
         if (!alive) return;

@@ -1,4 +1,33 @@
 /**
+ * URL base da API gateway (porta 4000 por padrão). Mesmo princípio do
+ * getBridgeBase: usa o hostname do browser dinamicamente pra funcionar
+ * de qualquer device da rede.
+ */
+export function getApiBase(): string {
+  const port = '4000';
+  const override = process.env.NEXT_PUBLIC_API_URL;
+  if (override && !/localhost/.test(override)) return override;
+  if (typeof window !== 'undefined' && window.location.hostname) {
+    return `http://${window.location.hostname}:${port}`;
+  }
+  return `http://localhost:${port}`;
+}
+
+/**
+ * URL do WebSocket cliente da API. Usa wss:// quando a página é
+ * servida via HTTPS, senão ws://.
+ */
+export function getApiWsUrl(): string {
+  const override = process.env.NEXT_PUBLIC_WS_URL;
+  if (override && !/localhost/.test(override)) return override;
+  if (typeof window !== 'undefined' && window.location.hostname) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.hostname}:4000/ws/client`;
+  }
+  return 'ws://localhost:4000/ws/client';
+}
+
+/**
  * URL base do bridge LAN (porta 8080 por padrão). Em vez de hardcodar
  * `localhost`, usa o hostname do browser — assim funciona quando você
  * acessa o kiosk de outro device da rede (tablet, monitor, celular).

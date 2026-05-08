@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, Clock3, Printer as PrinterIcon, Percent } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { getApiBase } from '@/lib/bridge-url';
 
 interface StatsResponse {
   totalJobs: number;
@@ -32,8 +32,8 @@ export function StatsStrip({ printerId }: { printerId?: string }) {
   useEffect(() => {
     let alive = true;
     const url = printerId
-      ? `${API_URL}/api/stats?printerId=${printerId}`
-      : `${API_URL}/api/stats`;
+      ? `${getApiBase()}/api/stats?printerId=${printerId}`
+      : `${getApiBase()}/api/stats`;
     fetch(url)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: StatsResponse) => {

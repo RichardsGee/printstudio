@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Printer } from 'lucide-react';
 import type { PrinterState } from '@printstudio/shared';
+import { KioskFullscreenButton } from '@/components/kiosk/kiosk-fullscreen-button';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -83,7 +84,9 @@ export function KioskStatusBanner({ printers, states }: Props) {
         </div>
       </div>
 
-      <div className="text-right shrink-0">
+      <div className="flex items-center gap-3 shrink-0">
+        <KioskFullscreenButton />
+        <div className="text-right">
         <div
           className="font-semibold tabular-nums leading-none"
           style={{ fontSize: 'clamp(1.5rem, 3vw, 2.5rem)' }}
@@ -95,6 +98,7 @@ export function KioskStatusBanner({ printers, states }: Props) {
           style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
         >
           {now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' })}
+        </div>
         </div>
       </div>
     </div>

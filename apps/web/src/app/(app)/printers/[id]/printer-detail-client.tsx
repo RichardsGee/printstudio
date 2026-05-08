@@ -57,7 +57,7 @@ interface TempPoint {
 }
 
 const TEMP_WINDOW_HOURS = 24;
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { getApiBase } from '@/lib/bridge-url';
 
 export function PrinterDetailClient({ printerId, name }: Props) {
   const { wsUrl, detecting } = useConnection();
@@ -73,7 +73,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
   // chegam a ~1/min (matching do throttle de insert no bridge-relay).
   useEffect(() => {
     let alive = true;
-    fetch(`${API_URL}/api/printers/${printerId}/temperatures?hours=${TEMP_WINDOW_HOURS}`, {
+    fetch(`${getApiBase()}/api/printers/${printerId}/temperatures?hours=${TEMP_WINDOW_HOURS}`, {
       credentials: 'include',
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
