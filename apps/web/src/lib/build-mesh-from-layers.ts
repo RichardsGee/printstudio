@@ -15,17 +15,47 @@ export interface LayersInput {
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
 }
 
-const CLOSED_THRESHOLD_MM2 = 1.0;
 const MIN_AREA_MM2 = 4.0;
 
-function isClosedPath(path: LayerPath): boolean {
-  const pts = path.points;
-  if (!pts || pts.length < 3) return false;
-  const first = pts[0];
-  const last = pts[pts.length - 1];
-  const dx = first[0] - last[0];
-  const dy = first[1] - last[1];
-  return dx * dx + dy * dy < CLOSED_THRESHOLD_MM2;
+/**
+ * Convex hull 2D via Andrew's monotone chain. O(n log n).
+ * Recebe pontos [x,y]; retorna o polígono fechado em CCW.
+ *
+ * Por que hull em vez de "maior path fechado"? O gcode da Bambu
+ * fragmenta o perímetro em centenas de segmentos curtos (numa layer
+ * de 826 paths, só 7 são fechados — e nenhum cobre o contorno todo).
+ * Hull dos pontos da layer captura a silhueta externa de forma
+ * robusta. Perde concavidades extremas, mas o resultado visual fica
+ * fiel pro objetivo "ver o que está imprimindo".
+ */
+function convexHull(pts: number[][]): number[][] {
+  if (pts.length < 3) return pts.slice();
+
+  const sorted = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+  const cross = (o: number[], a: number[], b: number[]): number =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+  const lower: number[][] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper: number[][] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
 }
 
 /** Shoelace formula — área absoluta em mm². */
@@ -38,6 +68,17 @@ function polygonArea(pts: number[][]): number {
     a -= pts[j][0] * pts[i][1];
   }
   return Math.abs(a) / 2;
+}
+
+function collectAllPoints(paths: LayerPath[]): number[][] {
+  const all: number[][] = [];
+  for (const p of paths) {
+    if (!p.points) continue;
+    for (const pt of p.points) {
+      if (pt && pt.length >= 2) all.push(pt);
+    }
+  }
+  return all;
 }
 
 /**
@@ -61,24 +102,17 @@ export function buildMeshFromLayers(input: LayersInput): {
   for (let i = 0; i < input.layers.length; i++) {
     const layer = input.layers[i];
 
-    // Filtra paths fechados — perímetros são closed loops, infill é zigzag.
-    const closedPaths = layer.paths.filter(isClosedPath);
-    if (closedPaths.length === 0) {
+    // Coleta TODOS os pontos da camada (perímetros + infill + travels já
+    // filtrados pelo parser) e tira o convex hull pra silhueta externa.
+    const allPts = collectAllPoints(layer.paths);
+    if (allPts.length < 3) {
       prevZ = layer.z;
       continue;
     }
 
-    // Pega o maior polígono fechado por área (= contorno externo).
-    let outer = closedPaths[0];
-    let outerArea = polygonArea(outer.points);
-    for (let j = 1; j < closedPaths.length; j++) {
-      const a = polygonArea(closedPaths[j].points);
-      if (a > outerArea) {
-        outer = closedPaths[j];
-        outerArea = a;
-      }
-    }
-    if (outerArea < MIN_AREA_MM2) {
+    const hull = convexHull(allPts);
+    const area = polygonArea(hull);
+    if (hull.length < 3 || area < MIN_AREA_MM2) {
       prevZ = layer.z;
       continue;
     }
@@ -92,11 +126,11 @@ export function buildMeshFromLayers(input: LayersInput): {
       continue;
     }
 
-    // Build Three.js Shape a partir dos pontos do contorno.
+    // Build Three.js Shape a partir do hull.
     const shape = new THREE.Shape();
-    shape.moveTo(outer.points[0][0], outer.points[0][1]);
-    for (let p = 1; p < outer.points.length; p++) {
-      shape.lineTo(outer.points[p][0], outer.points[p][1]);
+    shape.moveTo(hull[0][0], hull[0][1]);
+    for (let p = 1; p < hull.length; p++) {
+      shape.lineTo(hull[p][0], hull[p][1]);
     }
 
     const geom = new THREE.ExtrudeGeometry(shape, {
