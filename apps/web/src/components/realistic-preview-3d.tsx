@@ -161,12 +161,14 @@ export function RealisticPreview3D({
     const meshRadius = geometry.boundingSphere!.radius;
     const centerY = meshHeight / 2;
 
+    // Zoom mais próximo (1.15 vs antes 1.6) — mostra o detalhe da
+    // camada/clipping plane sem ficar com muita borda preta.
     const aspect = initialW / Math.max(1, initialH);
     const distH = meshRadius / Math.tan((35 * Math.PI) / 360);
     const distW = distH / aspect;
-    const dist = Math.max(distH, distW) * 1.6;
+    const dist = Math.max(distH, distW) * 1.15;
     camera.position.set(0, centerY * 1.05, dist);
-    camera.lookAt(0, centerY * 0.55, 0);
+    camera.lookAt(0, centerY * 0.5, 0);
 
     const belowPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     const abovePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);

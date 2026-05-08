@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import {
   Printer,
   Pause,
@@ -15,7 +16,11 @@ import {
 import type { PrinterState, PrinterStatus } from '@printstudio/shared';
 import { FilamentSwatch } from '@/components/filament-swatch';
 import { KioskPrintObject } from '@/components/kiosk/kiosk-print-object';
+import { RealisticPreview3D } from '@/components/realistic-preview-3d';
 import { cn, formatDuration, formatEtaClock } from '@/lib/utils';
+
+const LAN_HOST = process.env.NEXT_PUBLIC_LAN_DISCOVERY_HOST ?? 'localhost';
+const LAN_PORT = process.env.NEXT_PUBLIC_LAN_DISCOVERY_PORT ?? '8080';
 
 interface Props {
   printerId: string;
@@ -30,6 +35,17 @@ interface Props {
  * preenchimento vertical baseado nas camadas).
  */
 export function KioskPrinterCard({ printerId, name, state }: Props) {
+  // Detecta se há .3mf vinculado pra escolher render: 3D realista
+  // (modelo com mesh) vs PNG com fill vertical (fallback).
+  const [hasUploadedModel, setHasUploadedModel] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`http://${LAN_HOST}:${LAN_PORT}/api/printers/${printerId}/uploaded-model.info`)
+      .then((r) => { if (alive) setHasUploadedModel(r.ok); })
+      .catch(() => { if (alive) setHasUploadedModel(false); });
+    return () => { alive = false; };
+  }, [printerId]);
+
   const status = state?.status ?? 'UNKNOWN';
   const progress = state?.progressPct ?? 0;
   const activeSlot =
@@ -106,14 +122,24 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               A1 + AMS
             </div>
           </div>
-          <KioskPrintObject
-            printerId={printerId}
-            cacheKey={state?.currentFile ?? null}
-            currentLayer={state?.currentLayer ?? null}
-            totalLayers={state?.totalLayers ?? null}
-            filamentColor={activeSlot?.color ?? null}
-            className="aspect-square"
-          />
+          {hasUploadedModel ? (
+            <RealisticPreview3D
+              printerId={printerId}
+              currentLayer={state?.currentLayer ?? null}
+              totalLayers={state?.totalLayers ?? null}
+              filamentColor={activeSlot?.color ?? null}
+              className="aspect-square"
+            />
+          ) : (
+            <KioskPrintObject
+              printerId={printerId}
+              cacheKey={state?.currentFile ?? null}
+              currentLayer={state?.currentLayer ?? null}
+              totalLayers={state?.totalLayers ?? null}
+              filamentColor={activeSlot?.color ?? null}
+              className="aspect-square"
+            />
+          )}
         </div>
       ) : (
         <div className="relative aspect-[16/9] bg-gradient-to-b from-muted/30 to-background overflow-hidden flex items-center justify-center">
