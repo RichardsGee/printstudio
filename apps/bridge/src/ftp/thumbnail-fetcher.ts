@@ -64,7 +64,10 @@ export class ThumbnailFetcher {
   }
 
   private async connect(): Promise<FtpClient | null> {
-    const client = new FtpClient(15_000);
+    // Timeout de 90s — .3mf pode ter 30+MB e o FTPS implícito da Bambu
+    // é lento (TLS handshake + transferência criptografada). 15s era
+    // marginal pra arquivos pequenos e sempre falhava nos grandes.
+    const client = new FtpClient(90_000);
     client.ftp.verbose = false;
     try {
       await client.access({
