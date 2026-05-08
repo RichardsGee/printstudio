@@ -70,7 +70,6 @@ export const BambuPrintReportSchema = z.object({
   sdcard: z.boolean().optional(),
   gcode_state_change_reason: z.string().optional(),
   upgrade_state: z.record(z.unknown()).optional(),
-  fan_gear: z.number().optional(),
 }).passthrough();
 
 export const BambuReportSchema = z.object({

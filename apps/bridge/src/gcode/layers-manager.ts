@@ -1,11 +1,18 @@
 import type { PrinterConfig, PrinterState } from '@printstudio/shared';
 import type { Logger } from '../logger.js';
 import { ThumbnailFetcher } from '../ftp/thumbnail-fetcher.js';
+import type { MeshData } from '../ftp/mesh-extractor.js';
 import { parseGcodeToLayers, simplifyLayers, type LayersData } from './parser.js';
 
 interface CachedLayers {
   fileName: string;
   data: LayersData;
+  fetchedAt: number;
+}
+
+interface CachedMesh {
+  fileName: string;
+  data: MeshData;
   fetchedAt: number;
 }
 
@@ -23,6 +30,7 @@ const RETRY_MAX_MS = 300_000;
  */
 export class LayersManager {
   private readonly cache = new Map<string, CachedLayers>();
+  private readonly meshCache = new Map<string, CachedMesh>();
   private readonly inFlight = new Set<string>();
   private readonly targetFile = new Map<string, string>();
   private readonly retryTimer = new Map<string, NodeJS.Timeout>();
@@ -112,6 +120,20 @@ export class LayersManager {
         'layers: parsed',
       );
       this.cache.set(printerId, { fileName, data: simplified, fetchedAt: Date.now() });
+
+      if (payload.mesh) {
+        this.meshCache.set(printerId, { fileName, data: payload.mesh, fetchedAt: Date.now() });
+        this.logger.info(
+          {
+            printerId,
+            fileName,
+            triangles: payload.mesh.triangleCount,
+            vertices: payload.mesh.vertexCount,
+          },
+          'mesh: cached',
+        );
+      }
+
       this.retryDelay.delete(printerId);
     } catch (err) {
       this.logger.warn(
@@ -126,5 +148,9 @@ export class LayersManager {
 
   get(printerId: string): CachedLayers | null {
     return this.cache.get(printerId) ?? null;
+  }
+
+  getMesh(printerId: string): CachedMesh | null {
+    return this.meshCache.get(printerId) ?? null;
   }
 }
