@@ -438,12 +438,25 @@ function LayerSvg({
     <div
       className="absolute inset-0"
       style={{
-        perspective: '1600px',
-        perspectiveOrigin: '50% 60%',
-        background: 'radial-gradient(ellipse at 50% 55%, hsl(220 40% 10%) 0%, hsl(220 55% 3%) 75%)',
+        perspective: '1800px',
+        perspectiveOrigin: '50% 58%',
+        background:
+          'radial-gradient(ellipse at 50% 60%, hsl(220 50% 8%) 0%, hsl(225 70% 2%) 80%)',
       }}
     >
       <style>{`
+        @keyframes lyr-spin-${idSuffix} {
+          from { transform: rotateX(58deg) rotateZ(-15deg); }
+          to   { transform: rotateX(58deg) rotateZ(345deg); }
+        }
+        .lyr-stage-${idSuffix} {
+          position: absolute;
+          inset: 0;
+          transform-style: preserve-3d;
+          transform: rotateX(58deg) rotateZ(-15deg);
+          animation: lyr-spin-${idSuffix} 80s linear infinite;
+          will-change: transform;
+        }
         .lyr-base {
           position: absolute;
           inset: 0;
@@ -451,20 +464,20 @@ function LayerSvg({
           pointer-events: none;
           transition: opacity 300ms ease;
         }
-        .lyr-done-${idSuffix} { opacity: 0.88; }
+        .lyr-done-${idSuffix}   { opacity: 1; }
         .lyr-active-${idSuffix} { opacity: 1; }
-        .lyr-future-${idSuffix} { opacity: 0.12; }
-        .lyr-preview-${idSuffix} { opacity: 0.6; }
-        .lyr-active-${idSuffix} svg path { filter: drop-shadow(0 0 0.6px currentColor); }
+        .lyr-future-${idSuffix} { opacity: 0.06; }
+        .lyr-preview-${idSuffix} { opacity: 0.7; }
+        .lyr-done-${idSuffix} svg path,
+        .lyr-active-${idSuffix} svg path {
+          filter: drop-shadow(0 0.6px 0 rgba(0,0,0,0.7));
+        }
+        .lyr-active-${idSuffix} svg path {
+          filter: drop-shadow(0 0 1.2px currentColor) drop-shadow(0 0 0.5px #fff);
+        }
       `}</style>
 
-      <div
-        className="absolute inset-0"
-        style={{
-          transformStyle: 'preserve-3d',
-          transform: 'rotateX(62deg) rotateZ(-18deg)',
-        }}
-      >
+      <div className={`lyr-stage-${idSuffix}`}>
         {layerSvgs.map((layer, i) => {
           const isActive = !!(currentLayer && currentLayer > 0 && i === currentLayer - 1);
           return (
@@ -490,7 +503,7 @@ function LayerSvg({
                       key={tool}
                       d={d}
                       stroke={isActive ? '#ffffff' : c}
-                      strokeWidth={isActive ? 0.45 : 0.22}
+                      strokeWidth={isActive ? 1.2 : 0.6}
                       fill="none"
                       strokeLinejoin="round"
                       strokeLinecap="round"
