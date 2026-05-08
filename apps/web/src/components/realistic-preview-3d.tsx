@@ -422,7 +422,12 @@ export function RealisticPreview3D({
     refs.ringMesh.visible = progress > 0 && progress < 1;
     refs.ghostMaterial.visible = progress < 1;
     refs.printedMaterial.clippingPlanes = progress < 1 ? [refs.belowPlane] : [];
-    refs.energyMesh.scale.y = Math.max(clipY, 0.001);
+    // Cilindro de energia tem altura mínima visível mesmo em prints
+    // muito curtos / progresso baixo. Sem isso, num chaveiro de 5mm
+    // a 5% de progresso, scale.y = 0.25mm (invisível). Mínimo:
+    // o maior entre 15% da altura do mesh e 5mm absolutos.
+    const minEnergyHeight = Math.max(refs.meshHeight * 0.15, 5);
+    refs.energyMesh.scale.y = Math.max(clipY, minEnergyHeight);
     refs.energyMesh.visible = progress > 0 && progress < 1;
   }, [currentLayer, totalLayers, progressPct, mesh]);
 
