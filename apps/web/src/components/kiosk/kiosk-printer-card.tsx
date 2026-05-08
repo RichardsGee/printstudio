@@ -102,27 +102,29 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
         ) : null}
       </div>
 
-      {/* HERO — duas variações:
-            - imprimindo: split com Bambu A1 + objeto com fill vertical;
-            - ociosa/concluída/erro: Bambu A1 grande, sem distração */}
-      {printing ? (
-        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 p-3 bg-gradient-to-b from-muted/30 to-background">
-          <div className="relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/bambu-a1.png"
-              alt="Bambu Lab A1"
-              className="max-h-full max-w-full object-contain p-2"
-              draggable={false}
-            />
-            <div
-              className="absolute top-1.5 left-2 font-mono uppercase tracking-wider text-muted-foreground"
-              style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}
-            >
-              A1 + AMS
-            </div>
+      {/* HERO unificado: SEMPRE grid 2:3 (Bambu | Objeto) — mesma
+          estrutura visual em qualquer estado pra consistência no
+          dashboard. Quando ociosa, slot do objeto fica como
+          placeholder estilizado. */}
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 p-2.5 bg-gradient-to-b from-muted/30 to-background">
+        <div className="relative aspect-square rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-background overflow-hidden flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/bambu-a1.png"
+            alt="Bambu Lab A1"
+            className="max-h-full max-w-full object-contain p-2"
+            draggable={false}
+          />
+          <div
+            className="absolute top-1.5 left-2 font-mono uppercase tracking-wider text-muted-foreground"
+            style={{ fontSize: 'clamp(0.5625rem, 0.85vw, 0.75rem)' }}
+          >
+            A1 + AMS
           </div>
-          {hasUploadedModel ? (
+        </div>
+
+        {printing ? (
+          hasUploadedModel ? (
             <RealisticPreview3D
               printerId={printerId}
               currentLayer={state?.currentLayer ?? null}
@@ -139,124 +141,119 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               filamentColor={activeSlot?.color ?? null}
               className="aspect-square"
             />
-          )}
-        </div>
-      ) : (
-        <div className="relative aspect-[16/9] bg-gradient-to-b from-muted/30 to-background overflow-hidden flex items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/images/bambu-a1.png"
-            alt="Bambu Lab A1"
-            className="max-h-full max-w-full object-contain p-4"
-            draggable={false}
-          />
-        </div>
-      )}
+          )
+        ) : (
+          <IdleObjectPlaceholder status={status} />
+        )}
+      </div>
 
-      <div className="p-5 space-y-4">
-        {/* Filamento + swatch grande */}
-        {activeSlot ? (
-          <div className="flex items-center gap-3">
-            <FilamentSwatch
-              color={activeSlot.color ?? null}
-              active={!!activeSlot}
-              size="lg"
-            />
-            <div className="min-w-0">
-              <div
-                className="font-medium truncate"
-                style={{ fontSize: 'clamp(0.875rem, 1.4vw, 1.125rem)' }}
-              >
-                {activeSlot.filamentType ?? 'Filamento'}
-              </div>
-              <div
-                className="text-muted-foreground"
-                style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
-              >
-                Slot {activeSlot.slot + 1}
+      <div className="p-3 space-y-2.5">
+        {/* Linha 1: filamento + progresso inline (só quando imprimindo) */}
+        <div className="flex items-center justify-between gap-3">
+          {activeSlot ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <FilamentSwatch
+                color={activeSlot.color ?? null}
+                active={!!activeSlot}
+                size="md"
+              />
+              <div className="min-w-0">
+                <div
+                  className="font-medium truncate leading-tight"
+                  style={{ fontSize: 'clamp(0.8125rem, 1.2vw, 1rem)' }}
+                >
+                  {activeSlot.filamentType ?? 'Filamento'}
+                </div>
+                <div
+                  className="text-muted-foreground leading-tight"
+                  style={{ fontSize: 'clamp(0.625rem, 0.9vw, 0.8125rem)' }}
+                >
+                  Slot {activeSlot.slot + 1}
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
+          ) : (
+            <div
+              className="text-muted-foreground truncate"
+              style={{ fontSize: 'clamp(0.8125rem, 1.2vw, 1rem)' }}
+            >
+              {hasError
+                ? state?.hmsErrors?.[0]?.message ?? 'Erro na impressora'
+                : status === 'FINISH'
+                  ? 'Concluído'
+                  : status === 'OFFLINE'
+                    ? 'Sem comunicação'
+                    : 'Pronta para imprimir'}
+            </div>
+          )}
 
-        {/* Progresso GIANT quando imprimindo */}
-        {printing ? (
-          <>
-            <div className="flex items-baseline gap-3">
+          {printing ? (
+            <div className="flex items-baseline gap-1 shrink-0">
               <span
                 className="font-semibold tabular-nums leading-none text-foreground"
-                style={{ fontSize: 'clamp(3rem, 8vw, 6rem)' }}
+                style={{ fontSize: 'clamp(1.75rem, 3.6vw, 2.75rem)' }}
               >
                 {progress.toFixed(0)}
               </span>
               <span
                 className="text-muted-foreground"
-                style={{ fontSize: 'clamp(1.5rem, 3vw, 2.5rem)' }}
+                style={{ fontSize: 'clamp(0.875rem, 1.5vw, 1.25rem)' }}
               >
                 %
               </span>
             </div>
+          ) : null}
+        </div>
 
-            <div className="h-3 w-full rounded-full bg-muted/60 overflow-hidden">
-              <div
-                className={cn('h-full rounded-full transition-all duration-500', TONE_BAR_CLASSES[tone])}
-                style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-              />
-            </div>
-
-            {state?.stage && state.stage !== 'Imprimindo' ? (
-              <div
-                className="text-muted-foreground truncate"
-                style={{ fontSize: 'clamp(0.875rem, 1.4vw, 1.125rem)' }}
-              >
-                {state.stage}
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <div
-            className="text-muted-foreground"
-            style={{ fontSize: 'clamp(1rem, 1.6vw, 1.25rem)' }}
-          >
-            {hasError
-              ? state?.hmsErrors?.[0]?.message ?? 'Erro na impressora'
-              : status === 'FINISH'
-                ? `Concluído · ${state?.currentFile ?? '—'}`
-                : status === 'OFFLINE'
-                  ? 'Sem comunicação com a impressora'
-                  : 'Pronta para imprimir'}
-          </div>
-        )}
-
-        {/* Footer com ETA + camadas — só faz sentido se imprimindo */}
+        {/* Progress bar */}
         {printing ? (
-          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/40">
-            <KioskMetric
-              icon={Clock}
-              label="Termina às"
-              value={formatEtaClock(state?.remainingSec)}
-              subtitle={formatDuration(state?.remainingSec)}
-            />
-            <KioskMetric
-              icon={Layers}
-              label="Camada"
-              value={
-                state?.currentLayer != null && state?.totalLayers != null
-                  ? `${state.currentLayer}/${state.totalLayers}`
-                  : '—'
-              }
+          <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all duration-500', TONE_BAR_CLASSES[tone])}
+              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
             />
           </div>
         ) : null}
 
-        {/* Arquivo atual quando imprimindo (truncado) */}
-        {printing && state?.currentFile ? (
+        {/* Linha 2 (printing): ETA · Camada · Arquivo */}
+        {printing ? (
+          <div className="flex items-center justify-between gap-3 text-muted-foreground">
+            <span
+              className="inline-flex items-center gap-1.5 shrink-0"
+              style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              <span className="font-semibold text-foreground tabular-nums">
+                {formatEtaClock(state?.remainingSec)}
+              </span>
+              <span className="opacity-70 tabular-nums">
+                {formatDuration(state?.remainingSec)}
+              </span>
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 shrink-0"
+              style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span className="font-semibold text-foreground tabular-nums">
+                {state?.currentLayer != null && state?.totalLayers != null
+                  ? `${state.currentLayer}/${state.totalLayers}`
+                  : '—'}
+              </span>
+            </span>
+          </div>
+        ) : null}
+
+        {/* Stage / arquivo — única linha truncada quando imprimindo */}
+        {printing && (state?.stage || state?.currentFile) ? (
           <div
-            className="text-muted-foreground truncate"
-            style={{ fontSize: 'clamp(0.75rem, 1.1vw, 0.9375rem)' }}
-            title={state.currentFile}
+            className="text-muted-foreground truncate leading-tight"
+            style={{ fontSize: 'clamp(0.6875rem, 1vw, 0.875rem)' }}
+            title={state.currentFile ?? state.stage ?? ''}
           >
-            {state.currentFile}
+            {state?.stage && state.stage !== 'Imprimindo'
+              ? state.stage
+              : state?.currentFile ?? ''}
           </div>
         ) : null}
       </div>
@@ -264,44 +261,51 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
   );
 }
 
-function KioskMetric({
-  icon: Icon,
-  label,
-  value,
-  subtitle,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  subtitle?: string;
-}) {
+/**
+ * Placeholder visual pro slot do objeto quando a impressora está
+ * ociosa/concluída/erro. Mantém o mesmo container 1:1 do hero pra
+ * que o card preserve a estrutura visual em qualquer estado —
+ * dashboard de monitor não fica "pulando" entre layouts diferentes.
+ */
+function IdleObjectPlaceholder({ status }: { status: PrinterStatus }) {
+  const label =
+    status === 'FINISH'
+      ? 'Concluída'
+      : status === 'FAILED'
+        ? 'Erro'
+        : status === 'OFFLINE'
+          ? 'Offline'
+          : 'Sem trabalho';
+
+  const Icon =
+    status === 'FINISH'
+      ? CheckCircle2
+      : status === 'FAILED'
+        ? AlertTriangle
+        : status === 'OFFLINE'
+          ? CloudOff
+          : Circle;
+
+  const tone =
+    status === 'FINISH'
+      ? 'text-success'
+      : status === 'FAILED'
+        ? 'text-danger'
+        : 'text-muted-foreground';
+
   return (
-    <div className="flex flex-col gap-0.5">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        <Icon className="h-4 w-4 shrink-0" />
-        <span
-          className="uppercase tracking-wider"
-          style={{ fontSize: 'clamp(0.625rem, 0.9vw, 0.75rem)' }}
-        >
-          {label}
-        </span>
-      </div>
-      <div className="flex items-baseline gap-2">
-        <span
-          className="font-semibold tabular-nums"
-          style={{ fontSize: 'clamp(1.25rem, 2.4vw, 2rem)' }}
-        >
-          {value}
-        </span>
-        {subtitle ? (
-          <span
-            className="text-muted-foreground tabular-nums"
-            style={{ fontSize: 'clamp(0.75rem, 1.1vw, 0.9375rem)' }}
-          >
-            {subtitle}
-          </span>
-        ) : null}
-      </div>
+    <div className="relative aspect-square rounded-xl border border-dashed border-border/50 bg-gradient-to-b from-muted/15 to-background/30 overflow-hidden flex flex-col items-center justify-center gap-2">
+      <Icon
+        className={cn('opacity-60', tone)}
+        strokeWidth={1.2}
+        style={{ width: 'clamp(2rem, 3.5vw, 3rem)', height: 'clamp(2rem, 3.5vw, 3rem)' }}
+      />
+      <span
+        className={cn('uppercase tracking-wider font-mono', tone)}
+        style={{ fontSize: 'clamp(0.625rem, 0.95vw, 0.8125rem)' }}
+      >
+        {label}
+      </span>
     </div>
   );
 }
