@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils';
 interface Props {
   color: string | null;
   active?: boolean;
-  size?: number;
+  /** Pixel number ('size={140}') ou CSS unit ('size="100%"'). */
+  size?: number | string;
   rotating?: boolean;
   label?: string;
   className?: string;

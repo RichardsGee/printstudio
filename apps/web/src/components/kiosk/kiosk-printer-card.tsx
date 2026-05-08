@@ -168,22 +168,32 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
         )}
       </div>
 
-      {/* Row separada abaixo do hero: rolo de filamento alimentando
-          o tubo PTFE que se estende até a área do objeto 3D — dá a
-          sensação visual de "filamento entrando no print". */}
+      {/* Row separada abaixo do hero: rolo de filamento (grande, ~70%
+          da altura da imagem da impressora) alimentando o tubo PTFE
+          que atravessa todo o card até a área do objeto 3D.
+          O Spool usa CSS clamp pra escalar com a viewport — fica
+          imponente em monitor mas continua proporcional em tablet. */}
       {printing && activeSlot ? (
-        <div className="flex items-center gap-2 px-2.5 pb-2 -mt-1">
-          <Spool
-            color={activeSlot.color ?? null}
-            active
-            rotating
-            size={42}
-            className="shrink-0"
-          />
+        <div className="flex items-center gap-3 px-2.5 pb-2.5">
+          <div
+            className="relative shrink-0"
+            style={{
+              width: 'clamp(110px, 18vw, 220px)',
+              aspectRatio: '1',
+            }}
+          >
+            <Spool
+              color={activeSlot.color ?? null}
+              active
+              rotating
+              size="100%"
+              className="!w-full !h-full !block"
+            />
+          </div>
           <PtfeTube
             color={activeSlot.color ?? null}
             active
-            className="flex-1 h-3"
+            className="flex-1 h-5"
           />
         </div>
       ) : null}
