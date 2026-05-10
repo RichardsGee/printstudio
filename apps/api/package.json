@@ -6,28 +6,29 @@
   "main": "./dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc --noEmit && node build.mjs",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no lint yet'"
   },
   "dependencies": {
-    "@printstudio/shared": "workspace:*",
+    "@fastify/cookie": "^11.0.1",
+    "@fastify/cors": "^10.0.1",
+    "@fastify/helmet": "^12.0.1",
+    "@fastify/websocket": "^11.0.1",
     "@printstudio/db": "workspace:*",
+    "@printstudio/shared": "workspace:*",
+    "argon2": "^0.41.1",
+    "dotenv": "^16.4.5",
     "drizzle-orm": "^0.36.4",
     "fastify": "^5.1.0",
-    "@fastify/websocket": "^11.0.1",
-    "@fastify/cors": "^10.0.1",
-    "@fastify/cookie": "^11.0.1",
-    "@fastify/helmet": "^12.0.1",
-    "argon2": "^0.41.1",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
-    "dotenv": "^16.4.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
+    "esbuild": "^0.28.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"
   }

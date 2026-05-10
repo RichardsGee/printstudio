@@ -51,8 +51,10 @@ COPY apps/api/package.json ./apps/api/
 
 RUN pnpm install --frozen-lockfile --prod
 
-COPY --from=build /repo/packages/shared/src ./packages/shared/src
-COPY --from=build /repo/packages/db/src ./packages/db/src
+# O bundle do esbuild (apps/api/build.mjs) inclui workspace deps
+# inline (@printstudio/db, @printstudio/shared). Só precisamos do
+# bundle final + node_modules das deps externas (fastify, drizzle,
+# argon2, etc — instaladas pelo `pnpm install --prod` acima).
 COPY --from=build /repo/apps/api/dist ./apps/api/dist
 
 WORKDIR /repo/apps/api
