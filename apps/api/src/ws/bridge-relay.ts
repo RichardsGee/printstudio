@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { BridgeMessageSchema, PrinterStateSchema, PrinterEventSchema } from '@printstudio/shared';
-import { and, eq, sql, isNull } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { printerState, events, temperatureSamples, printJobs, printers as printersTable } from '@printstudio/db';
 import type { PrinterStatus } from '@printstudio/shared';
 import { processStateAlerts } from '../notifier/alerts.js';
@@ -70,7 +70,7 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
       }
     }, 5000);
 
-    socket.on('message', async (raw) => {
+    socket.on('message', async (raw: Buffer) => {
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw.toString());
@@ -293,7 +293,7 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
       if (bridgeId) logger.info({ bridgeId }, 'bridge socket closed');
     });
 
-    socket.on('error', (err) => {
+    socket.on('error', (err: Error) => {
       logger.error({ err, bridgeId }, 'bridge socket error');
     });
   });

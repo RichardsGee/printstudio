@@ -61,7 +61,7 @@ export async function registerClientRelay(app: FastifyInstance): Promise<void> {
     hub.registerClient(socket);
     logger.info('client connected');
 
-    socket.on('message', (raw) => {
+    socket.on('message', (raw: Buffer) => {
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw.toString());
@@ -132,7 +132,7 @@ export async function registerClientRelay(app: FastifyInstance): Promise<void> {
       logger.info('client disconnected');
     });
 
-    socket.on('error', (err) => {
+    socket.on('error', (err: Error) => {
       logger.error({ err }, 'client socket error');
     });
   });
