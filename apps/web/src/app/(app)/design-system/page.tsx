@@ -114,7 +114,7 @@ export default function DesignSystemPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <SectionLabel className="mb-2">layout="stack" (default)</SectionLabel>
+            <SectionLabel className="mb-2">layout=&quot;stack&quot; (default)</SectionLabel>
             <div className="grid grid-cols-4 gap-3">
               <Metric label="Bico" value="215.3°C" tone="warning" />
               <Metric label="Mesa" value="62.0°C" tone="warning" />
@@ -124,7 +124,7 @@ export default function DesignSystemPage() {
           </div>
 
           <div>
-            <SectionLabel className="mb-2">layout="card"</SectionLabel>
+            <SectionLabel className="mb-2">layout=&quot;card&quot;</SectionLabel>
             <div className="grid grid-cols-4 gap-3">
               <Metric label="Termina" value="04:32" layout="card" />
               <Metric label="Restante" value="0m" layout="card" />
@@ -134,7 +134,7 @@ export default function DesignSystemPage() {
           </div>
 
           <div>
-            <SectionLabel className="mb-2">layout="row"</SectionLabel>
+            <SectionLabel className="mb-2">layout=&quot;row&quot;</SectionLabel>
             <div className="space-y-1 max-w-xs">
               <Metric label="Bico" value="215°C / 220°" icon={Thermometer} tone="warning" layout="row" />
               <Metric label="Mesa" value="62°C / 60°" icon={Flame} tone="warning" layout="row" />
@@ -318,7 +318,7 @@ export default function DesignSystemPage() {
                 <span data-mc-label className="text-xs font-semibold uppercase text-[var(--mc-accent)]">
                   [ACTIVE]
                 </span>
-                <span data-mc-id className="text-[10px] text-muted-foreground">// STN-3F0C</span>
+                <span data-mc-id className="text-[10px] text-muted-foreground">{'// STN-3F0C'}</span>
                 <span className="ml-auto text-xs font-semibold">A1 PRINCIPAL</span>
               </div>
               <div className="p-4 space-y-2">

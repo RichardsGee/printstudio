@@ -122,7 +122,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
           className="text-muted-foreground"
           style={{ fontSize: 'clamp(0.625rem, 0.95vw, 0.8125rem)' }}
         >
-          // {stationId}
+          {`// ${stationId}`}
         </span>
         <span
           className="ml-auto font-semibold tracking-tight truncate text-foreground"
