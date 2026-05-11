@@ -18,13 +18,20 @@ import {
   loginWithCode,
 } from '@/lib/bambu-cloud-api';
 
-const credKey = (() => {
+// Lazy: parseKey só roda quando o handler é invocado em runtime.
+// Validação eager (top-level) quebrava `next build` no stage "collect
+// page data" porque BAMBU_CRED_KEY não está nos build-args do Next,
+// só nas envs de runtime do container.
+let cachedCredKey: Buffer | null = null;
+function getCredKey(): Buffer {
+  if (cachedCredKey) return cachedCredKey;
   const k = process.env.BAMBU_CRED_KEY;
   if (!k) {
     throw new Error('BAMBU_CRED_KEY not set on the web service');
   }
-  return parseKey(k);
-})();
+  cachedCredKey = parseKey(k);
+  return cachedCredKey;
+}
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
@@ -50,8 +57,9 @@ export async function POST(req: Request) {
     ]);
 
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
-    const encryptedAccess = encrypt(accessToken, credKey);
-    const encryptedRefresh = refreshToken ? encrypt(refreshToken, credKey) : null;
+    const key = getCredKey();
+    const encryptedAccess = encrypt(accessToken, key);
+    const encryptedRefresh = refreshToken ? encrypt(refreshToken, key) : null;
     const now = new Date();
 
     await getDb()
