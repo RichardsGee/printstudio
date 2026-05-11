@@ -246,43 +246,62 @@ export function RealisticPreview3D({
     setMesh(null);
 
     const plate = cloudPlateIndex && cloudPlateIndex > 0 ? cloudPlateIndex : 1;
-    const tryCloud = cloudBambuModelId
-      ? fetch(
-          `/api/cached-models/by-model/${encodeURIComponent(cloudBambuModelId)}?plate=${plate}`,
-          { credentials: 'include' },
-        ).then(async (r) => {
-          if (r.status === 404) return null;
+
+    // Quando o print é cloud (currentBambuModelId presente), cached_models
+    // é a ÚNICA fonte de verdade. Sem cached → status no-model → UI cai
+    // pro cloudPickUrl (pick_N.png da Bambu). NÃO fazer fallback pro
+    // bridge LAN, que pode ter mesh antigo de outro print uploadado
+    // localmente e mostraria modelo errado.
+    if (cloudBambuModelId) {
+      fetch(
+        `/api/cached-models/by-model/${encodeURIComponent(cloudBambuModelId)}?plate=${plate}`,
+        { credentials: 'include' },
+      )
+        .then(async (r) => {
+          if (!alive) return;
+          if (r.status === 404) {
+            setStatus('no-model');
+            return;
+          }
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const data = (await r.json()) as { meshPayload: MeshPayload };
-          return data.meshPayload;
-        })
-      : Promise.resolve(null);
-
-    tryCloud
-      .then(async (cloudMesh) => {
-        if (!alive) return;
-        if (cloudMesh && cloudMesh.vertices?.length && cloudMesh.indices?.length) {
-          setMesh(cloudMesh);
+          if (!alive) return;
+          if (!data.meshPayload?.vertices?.length || !data.meshPayload?.indices?.length) {
+            setStatus('no-model');
+            return;
+          }
+          setMesh(data.meshPayload);
           setStatus('ok');
-          return;
-        }
-        // Fallback pro bridge LAN (modo legado)
-        const url = `${getBridgeBase()}/api/printers/${printerId}/uploaded-model.json`;
-        const r = await fetch(url);
-        if (r.status === 404) throw new Error('no-model');
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data: MeshPayload = await r.json();
-        if (!alive) return;
-        if (!data.vertices?.length || !data.indices?.length) {
-          throw new Error('empty mesh');
-        }
-        setMesh(data);
-        setStatus('ok');
-      })
-      .catch((err) => {
-        if (!alive) return;
-        setStatus(err.message === 'no-model' ? 'no-model' : 'error');
-      });
+        })
+        .catch(() => {
+          if (alive) setStatus('error');
+        });
+    } else {
+      // Modo legado bridge LAN: print sem cloudBambuModelId (impressora
+      // não está em cloud mode ou worker não conectou). Busca uploaded-
+      // model.json no bridge local.
+      const url = `${getBridgeBase()}/api/printers/${printerId}/uploaded-model.json`;
+      fetch(url)
+        .then(async (r) => {
+          if (!alive) return;
+          if (r.status === 404) {
+            setStatus('no-model');
+            return;
+          }
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data: MeshPayload = await r.json();
+          if (!alive) return;
+          if (!data.vertices?.length || !data.indices?.length) {
+            setStatus('no-model');
+            return;
+          }
+          setMesh(data);
+          setStatus('ok');
+        })
+        .catch(() => {
+          if (alive) setStatus('error');
+        });
+    }
 
     return () => {
       alive = false;
