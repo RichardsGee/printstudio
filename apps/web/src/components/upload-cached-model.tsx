@@ -11,6 +11,11 @@ import type { CachedModelUploadRequest } from '@printstudio/shared';
 
 interface Props {
   bambuModelId: string;
+  /** Plate atualmente sendo impresso. Upload salva o mesh COMBINADO
+   *  vinculado a esse plate. Pra outros plates do mesmo .3mf, upload
+   *  novamente quando estiverem em impressão. (Workaround: parser
+   *  client-side não consegue separar plates Bambu com confiabilidade.) */
+  currentPlateIndex?: number | null;
   /** Callback após upload bem-sucedido. */
   onUploaded?: () => void;
   className?: string;
@@ -41,7 +46,12 @@ interface PlateMesh {
  * Faz POST sequencial pra /api/cached-models — 1 por plate.
  * Próximas impressões do mesmo modelo+plate reusam o mesh sem upload.
  */
-export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props) {
+export function UploadCachedModel({
+  bambuModelId,
+  currentPlateIndex,
+  onUploaded,
+  className,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [progress, setProgress] = useState<string | null>(null);
@@ -104,45 +114,40 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
       return;
     }
 
+    const plateToSave = currentPlateIndex && currentPlateIndex > 0 ? currentPlateIndex : 1;
+
     start(async () => {
       try {
         setProgress('Lendo arquivo…');
         const buffer = await file.arrayBuffer();
 
-        setProgress('Parseando plates…');
-        const plates = await parsePlates(buffer);
-        if (plates.length === 0) {
-          throw new Error('Nenhum plate com mesh encontrado no .3mf');
+        setProgress('Parseando mesh…');
+        const combined = await parseCombinedMesh(buffer);
+
+        setProgress(`Enviando plate ${plateToSave}…`);
+        const payload: CachedModelUploadRequest = {
+          bambuModelId,
+          plateIndex: plateToSave,
+          filename: file.name,
+          sizeBytes: file.size,
+          meshPayload: {
+            vertices: combined.vertices,
+            indices: combined.indices,
+          },
+        };
+        const res = await fetch('/api/cached-models', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`upload falhou: ${txt.slice(0, 120)}`);
         }
 
-        for (let i = 0; i < plates.length; i++) {
-          const plate = plates[i]!;
-          setProgress(`Enviando plate ${i + 1}/${plates.length}…`);
-          const payload: CachedModelUploadRequest = {
-            bambuModelId,
-            plateIndex: plate.plateIndex,
-            filename: file.name,
-            sizeBytes: file.size,
-            meshPayload: {
-              vertices: plate.vertices,
-              indices: plate.indices,
-            },
-          };
-          const res = await fetch('/api/cached-models', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`upload plate ${plate.plateIndex} falhou: ${txt.slice(0, 120)}`);
-          }
-        }
-
-        const totalVerts = plates.reduce((s, p) => s + p.vertices.length / 3, 0);
         toast.success(
-          `Vinculado: ${plates.length} plate(s) · ${totalVerts.toLocaleString('pt-BR')} vértices`,
+          `Vinculado ao plate ${plateToSave} · ${(combined.vertices.length / 3).toLocaleString('pt-BR')} vértices`,
         );
         onUploaded?.();
       } catch (err) {
@@ -203,6 +208,34 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
  * transformações, e parseia Metadata/model_settings.config pra mapear
  * plate_id → object_ids.
  */
+/**
+ * Parseia .3mf e combina TODOS os meshes em um único PlateMesh.
+ * Usado pra salvar o mesh vinculado ao plate atual da impressora.
+ * (Versão simplificada — separação por plate Bambu requer parser
+ * dedicado pro model_settings.config + build items XML, que é
+ * frágil. Workaround atual: 1 upload por plate em uso.)
+ */
+async function parseCombinedMesh(
+  buffer: ArrayBuffer,
+): Promise<{ vertices: number[]; indices: number[] }> {
+  const loader = new ThreeMFLoader();
+  const group = loader.parse(buffer);
+  const all: THREE.Mesh[] = [];
+  group.traverse((obj: THREE.Object3D) => {
+    if (obj instanceof THREE.Mesh && obj.geometry?.getAttribute('position')) {
+      all.push(obj);
+    }
+  });
+  if (all.length === 0) {
+    throw new Error(
+      'ThreeMFLoader não retornou meshes — arquivo .3mf pode estar corrompido',
+    );
+  }
+  const combined = combineMeshes(all);
+  if (!combined) throw new Error('Falha ao combinar meshes');
+  return combined;
+}
+
 async function parsePlates(buffer: ArrayBuffer): Promise<PlateMesh[]> {
   const uint8 = new Uint8Array(buffer);
   const files = unzipSync(uint8);

@@ -262,8 +262,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             <CardTitle className="text-sm">Impressão atual</CardTitle>
             {state?.currentBambuModelId ? (
               <UploadCachedModel
-                key={state.currentBambuModelId}
+                key={`${state.currentBambuModelId}-${state.currentPlateIndex ?? 1}`}
                 bambuModelId={state.currentBambuModelId}
+                currentPlateIndex={state.currentPlateIndex ?? null}
                 onUploaded={() => {
                   // Hard reload pra forçar RealisticPreview3D buscar o
                   // mesh recém-uploadado (key prop também muda).
