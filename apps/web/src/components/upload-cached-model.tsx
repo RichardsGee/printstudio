@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import * as THREE from 'three';
 import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
+import { unzipSync, strFromU8 } from 'fflate';
 import { Upload, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -116,8 +117,19 @@ export function UploadCachedModel({
         setProgress('Lendo arquivo…');
         const buffer = await file.arrayBuffer();
 
-        setProgress('Parseando mesh…');
-        const combined = await parseCombinedMesh(buffer);
+        setProgress(`Extraindo plate ${plateToSave}…`);
+        // Tenta parser dedicado Bambu (filtra só objects do plate via
+        // instance_id no model_settings.config). Fallback: combina tudo.
+        let mesh: { vertices: number[]; indices: number[] } | null = null;
+        try {
+          mesh = parsePlateFromBambu3mf(buffer, plateToSave);
+        } catch (parseErr) {
+          console.warn('Parser plate-aware falhou, usando fallback:', parseErr);
+        }
+        if (!mesh) {
+          setProgress('Plate não detectado, salvando combinado…');
+          mesh = await parseCombinedMesh(buffer);
+        }
 
         setProgress(`Enviando plate ${plateToSave}…`);
         const payload: CachedModelUploadRequest = {
@@ -125,10 +137,7 @@ export function UploadCachedModel({
           plateIndex: plateToSave,
           filename: file.name,
           sizeBytes: file.size,
-          meshPayload: {
-            vertices: combined.vertices,
-            indices: combined.indices,
-          },
+          meshPayload: { vertices: mesh.vertices, indices: mesh.indices },
         };
         const res = await fetch('/api/cached-models', {
           method: 'POST',
@@ -142,7 +151,7 @@ export function UploadCachedModel({
         }
 
         toast.success(
-          `Vinculado ao plate ${plateToSave} · ${(combined.vertices.length / 3).toLocaleString('pt-BR')} vértices`,
+          `Vinculado ao plate ${plateToSave} · ${(mesh.vertices.length / 3).toLocaleString('pt-BR')} vértices`,
         );
         onUploaded?.();
       } catch (err) {
@@ -260,4 +269,161 @@ function combineMeshes(meshes: THREE.Mesh[]): { vertices: number[]; indices: num
 
   if (vertices.length === 0) return null;
   return { vertices, indices };
+}
+
+/**
+ * Parser dedicado do .3mf Bambu — extrai SÓ os objetos/instâncias do
+ * plate especificado, aplicando os transforms corretos.
+ *
+ * Estrutura:
+ *  - 3D/3dmodel.model define objetos (mesh geometry) e build items
+ *    (instâncias com transform). Ordem dos `<item>` no `<build>` define
+ *    o instance_id (índice GLOBAL zero-based).
+ *  - Metadata/model_settings.config lista plates, e pra cada plate
+ *    lista `<model_instance>` com `<metadata key=object_id>` e
+ *    `<metadata key=instance_id>` referenciando os build items.
+ *
+ * Aplica matrix 3MF (12 floats row-major, m41/m42/m43 = translação).
+ *
+ * Retorna null se algo der errado (caller usa fallback combineMesh).
+ */
+function parsePlateFromBambu3mf(
+  buffer: ArrayBuffer,
+  plateIndex: number,
+): { vertices: number[]; indices: number[] } | null {
+  if (typeof window === 'undefined' || !window.DOMParser) return null;
+  const files = unzipSync(new Uint8Array(buffer));
+
+  const modelRaw = files['3D/3dmodel.model'];
+  const settingsRaw = files['Metadata/model_settings.config'];
+  if (!modelRaw || !settingsRaw) return null;
+
+  const parser = new DOMParser();
+  const modelDoc = parser.parseFromString(strFromU8(modelRaw), 'application/xml');
+  const settingsDoc = parser.parseFromString(strFromU8(settingsRaw), 'application/xml');
+
+  // 1. objects (mesh data por id). querySelector funciona apesar do
+  // namespace porque DOMParser browser ignora ns no querySelector.
+  type ObjectMesh = { vertices: Float32Array; indices: number[] };
+  const objects = new Map<string, ObjectMesh>();
+  modelDoc.querySelectorAll('object').forEach((obj) => {
+    const id = obj.getAttribute('id');
+    if (!id) return;
+    const verts: number[] = [];
+    obj.querySelectorAll('mesh > vertices > vertex').forEach((v) => {
+      verts.push(
+        Number(v.getAttribute('x') ?? 0),
+        Number(v.getAttribute('y') ?? 0),
+        Number(v.getAttribute('z') ?? 0),
+      );
+    });
+    const tris: number[] = [];
+    obj.querySelectorAll('mesh > triangles > triangle').forEach((t) => {
+      tris.push(
+        Number(t.getAttribute('v1') ?? 0),
+        Number(t.getAttribute('v2') ?? 0),
+        Number(t.getAttribute('v3') ?? 0),
+      );
+    });
+    if (verts.length > 0 && tris.length > 0) {
+      objects.set(id, { vertices: new Float32Array(verts), indices: tris });
+    }
+  });
+
+  // 2. Build items na ordem (instance_id = índice GLOBAL).
+  type BuildItem = { objectId: string; matrix: number[] };
+  const buildItems: BuildItem[] = [];
+  modelDoc.querySelectorAll('build > item').forEach((item) => {
+    const objectId = item.getAttribute('objectid');
+    if (!objectId) return;
+    const transform = (item.getAttribute('transform') ?? '1 0 0 0 1 0 0 0 1 0 0 0')
+      .trim()
+      .split(/\s+/)
+      .map(Number);
+    if (transform.length !== 12) return;
+    buildItems.push({ objectId, matrix: transform });
+  });
+
+  if (objects.size === 0 || buildItems.length === 0) return null;
+
+  // 3. Acha o plate desejado em model_settings.config
+  let targetPlate: Element | null = null;
+  settingsDoc.querySelectorAll('plate').forEach((p) => {
+    if (targetPlate) return;
+    p.querySelectorAll(':scope > metadata').forEach((m) => {
+      if (
+        m.getAttribute('key') === 'plate_id' &&
+        Number(m.getAttribute('value')) === plateIndex
+      ) {
+        targetPlate = p;
+      }
+    });
+  });
+  if (!targetPlate) return null;
+
+  // 4. Lê os model_instances do plate
+  interface InstanceRef {
+    objectId: string;
+    instanceId: number;
+  }
+  const refs: InstanceRef[] = [];
+  (targetPlate as Element).querySelectorAll('model_instance').forEach((mi) => {
+    let objId = '';
+    let instId = -1;
+    mi.querySelectorAll('metadata').forEach((m) => {
+      const k = m.getAttribute('key');
+      const v = m.getAttribute('value') ?? '';
+      if (k === 'object_id') objId = v;
+      else if (k === 'instance_id') instId = Number(v);
+    });
+    if (objId && instId >= 0) refs.push({ objectId: objId, instanceId: instId });
+  });
+  if (refs.length === 0) return null;
+
+  // 5. Pra cada ref, encontra build item correto e aplica transform.
+  // Tenta interpretar instance_id de 2 formas — primeiro como índice
+  // global no build, depois como índice por objectId (Bambu varia).
+  const itemsByObjectId = new Map<string, BuildItem[]>();
+  for (const b of buildItems) {
+    const arr = itemsByObjectId.get(b.objectId) ?? [];
+    arr.push(b);
+    itemsByObjectId.set(b.objectId, arr);
+  }
+
+  const allVerts: number[] = [];
+  const allIdx: number[] = [];
+  let vOffset = 0;
+
+  for (const ref of refs) {
+    // Estratégia 1: instance_id como índice global
+    let item: BuildItem | undefined = buildItems[ref.instanceId];
+    if (!item || item.objectId !== ref.objectId) {
+      // Estratégia 2: instance_id como índice dentro dos items do mesmo objectId
+      item = itemsByObjectId.get(ref.objectId)?.[ref.instanceId];
+    }
+    if (!item) continue;
+    const obj = objects.get(item.objectId);
+    if (!obj) continue;
+
+    const m = item.matrix;
+    // 3MF transform: row-major; m[0..8] = rotação/escala 3x3, m[9..11] = translação
+    // Apply: [x' y' z'] = [x y z] * R + t
+    const nVerts = obj.vertices.length / 3;
+    for (let i = 0; i < nVerts; i++) {
+      const x = obj.vertices[i * 3]!;
+      const y = obj.vertices[i * 3 + 1]!;
+      const z = obj.vertices[i * 3 + 2]!;
+      const nx = x * m[0]! + y * m[3]! + z * m[6]! + m[9]!;
+      const ny = x * m[1]! + y * m[4]! + z * m[7]! + m[10]!;
+      const nz = x * m[2]! + y * m[5]! + z * m[8]! + m[11]!;
+      allVerts.push(nx, ny, nz);
+    }
+    for (let i = 0; i < obj.indices.length; i++) {
+      allIdx.push(obj.indices[i]! + vOffset);
+    }
+    vOffset += nVerts;
+  }
+
+  if (allVerts.length === 0) return null;
+  return { vertices: allVerts, indices: allIdx };
 }
