@@ -9,6 +9,9 @@ const ConfigSchema = z.object({
   API_CORS_ORIGIN: z.string().url(),
   AUTH_SECRET: z.string().min(16),
   CLOUD_API_TOKEN: z.string().min(16),
+  // Chave master AES-256 (32 bytes base64) pra encriptar tokens Bambu
+  // Cloud em repouso. Gere com: openssl rand -base64 32
+  BAMBU_CRED_KEY: z.string().min(32),
   // Notificações — opcionais. Se ambos presentes, eventos críticos
   // (HMS fatal/error, falha de impressão, porta aberta) disparam msg
   // via Bot API do Telegram.

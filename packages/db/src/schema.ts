@@ -22,7 +22,12 @@ const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
   fromDriver: (val) => new Uint8Array(val),
   toDriver: (val) => Buffer.from(val),
 });
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
+
+// UUID determinístico da org "Default" criada pela migration 0005.
+// Usado como DEFAULT na coluna organization_id pra manter backward-compat
+// com code que ainda não passa org_id explicitamente.
+const DEFAULT_ORG_ID = sql`'00000000-0000-0000-0000-000000000001'::uuid`;
 
 export const printerStatusEnum = pgEnum('printer_status', [
   'IDLE',
@@ -86,7 +91,8 @@ export const printers = pgTable('printers', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id')
     .references(() => organizations.id, { onDelete: 'cascade' })
-    .notNull(),
+    .notNull()
+    .default(DEFAULT_ORG_ID),
   name: text('name').notNull(),
   serial: text('serial').notNull().unique(),
   accessCode: text('access_code').notNull(),
@@ -138,7 +144,8 @@ export const printJobs = pgTable('print_jobs', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id')
     .references(() => organizations.id, { onDelete: 'cascade' })
-    .notNull(),
+    .notNull()
+    .default(DEFAULT_ORG_ID),
   printerId: uuid('printer_id')
     .references(() => printers.id, { onDelete: 'cascade' })
     .notNull(),
@@ -163,7 +170,8 @@ export const temperatureSamples = pgTable('temperature_samples', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   organizationId: uuid('organization_id')
     .references(() => organizations.id, { onDelete: 'cascade' })
-    .notNull(),
+    .notNull()
+    .default(DEFAULT_ORG_ID),
   printerId: uuid('printer_id')
     .references(() => printers.id, { onDelete: 'cascade' })
     .notNull(),
@@ -179,7 +187,8 @@ export const events = pgTable('events', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   organizationId: uuid('organization_id')
     .references(() => organizations.id, { onDelete: 'cascade' })
-    .notNull(),
+    .notNull()
+    .default(DEFAULT_ORG_ID),
   printerId: uuid('printer_id').references(() => printers.id, { onDelete: 'cascade' }),
   type: text('type').notNull(),
   severity: eventSeverityEnum('severity').default('INFO').notNull(),

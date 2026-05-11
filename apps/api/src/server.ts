@@ -10,6 +10,7 @@ import { registerPrinterRoutes } from './routes/printers.js';
 import { registerJobRoutes } from './routes/jobs.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerBambuRoutes } from './routes/bambu.js';
 import { registerBridgeRelay } from './ws/bridge-relay.js';
 import { registerClientRelay } from './ws/client-relay.js';
 
@@ -31,6 +32,7 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   await registerHealthRoutes(app);
   await registerAuthRoutes(app);
+  await registerBambuRoutes(app);
   await registerPrinterRoutes(app);
   await registerJobRoutes(app);
   await registerEventRoutes(app);

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { LayoutDashboard, History, Bell, Printer, LogOut, Palette, Monitor } from 'lucide-react';
+import { LayoutDashboard, History, Bell, Printer, LogOut, Palette, Monitor, Cloud } from 'lucide-react';
 import { auth, signOut } from '@/lib/auth';
 import { DualModeIndicator } from '@/components/dual-mode-indicator';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ const NAV = [
   { href: '/kiosk', label: 'Kiosk', icon: Monitor },
   { href: '/history', label: 'Histórico', icon: History },
   { href: '/events', label: 'Eventos', icon: Bell },
+  { href: '/settings/bambu-connect', label: 'Bambu Cloud', icon: Cloud },
   { href: '/design-system', label: 'Design', icon: Palette },
 ];
 
