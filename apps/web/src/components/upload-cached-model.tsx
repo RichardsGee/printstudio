@@ -312,13 +312,15 @@ function parsePlateFromBambu3mf(
   const modelDoc = parser.parseFromString(strFromU8(modelRaw), 'application/xml');
   const settingsDoc = parser.parseFromString(strFromU8(settingsRaw), 'application/xml');
 
-  // 1. objects (mesh data por id). querySelector funciona apesar do
-  // namespace porque DOMParser browser ignora ns no querySelector.
+  // 1. objects (mesh data por id). Bambu Studio usa formato split:
+  // 3D/3dmodel.model só lista components apontando pra arquivos externos
+  // em 3D/Objects/object_N.model (cada um com o mesh inline). Lemos
+  // PRIMEIRO os arquivos externos, DEPOIS o 3dmodel.model como fallback
+  // pra objects com mesh inline.
   type ObjectMesh = { vertices: Float32Array; indices: number[] };
   const objects = new Map<string, ObjectMesh>();
-  modelDoc.querySelectorAll('object').forEach((obj) => {
-    const id = obj.getAttribute('id');
-    if (!id) return;
+
+  function extractMeshFromObjectElement(obj: Element): ObjectMesh | null {
     const verts: number[] = [];
     obj.querySelectorAll('mesh > vertices > vertex').forEach((v) => {
       verts.push(
@@ -335,10 +337,43 @@ function parsePlateFromBambu3mf(
         Number(t.getAttribute('v3') ?? 0),
       );
     });
-    if (verts.length > 0 && tris.length > 0) {
-      objects.set(id, { vertices: new Float32Array(verts), indices: tris });
+    if (verts.length === 0 || tris.length === 0) return null;
+    return { vertices: new Float32Array(verts), indices: tris };
+  }
+
+  // 1a. Lê arquivos externos 3D/Objects/object_*.model (formato Bambu split)
+  let splitFileCount = 0;
+  for (const path of Object.keys(files)) {
+    if (!path.startsWith('3D/Objects/') || !path.endsWith('.model')) continue;
+    splitFileCount++;
+    try {
+      const objDoc = parser.parseFromString(strFromU8(files[path]!), 'application/xml');
+      objDoc.querySelectorAll('object').forEach((obj) => {
+        const id = obj.getAttribute('id');
+        if (!id) return;
+        const mesh = extractMeshFromObjectElement(obj);
+        if (mesh) objects.set(id, mesh);
+      });
+    } catch (err) {
+      console.warn(`[3mf] falha parsing ${path}:`, err);
+    }
+  }
+  console.log(`[3mf] objects de arquivos externos: ${splitFileCount} files → ${objects.size} objects`);
+
+  // 1b. Fallback: lê objects inline do 3dmodel.model (formato monolítico)
+  let inlineCount = 0;
+  modelDoc.querySelectorAll('object').forEach((obj) => {
+    const id = obj.getAttribute('id');
+    if (!id || objects.has(id)) return;
+    const mesh = extractMeshFromObjectElement(obj);
+    if (mesh) {
+      objects.set(id, mesh);
+      inlineCount++;
     }
   });
+  if (inlineCount > 0) {
+    console.log(`[3mf] +${inlineCount} objects inline do 3dmodel.model`);
+  }
 
   // 2. Build items na ordem (instance_id = índice GLOBAL).
   type BuildItem = { objectId: string; matrix: number[] };

@@ -66,6 +66,10 @@ export function PrinterDetailClient({ printerId, name }: Props) {
   const pushEvent = usePrinterStore((s) => s.pushEvent);
   const [history, setHistory] = useState<TempPoint[]>([]);
   const [events, setEvents] = useState<PrinterEvent[]>([]);
+  // Bumped pelo UploadCachedModel após upload — força PrintPreview
+  // remontar e re-buscar o mesh, sem reload da página (preserva logs
+  // do DevTools).
+  const [cachedVersion, setCachedVersion] = useState(0);
   const clientRef = useRef<WsClient | null>(null);
 
   // Carrega histórico de 24h do endpoint na montagem, e depois vai
@@ -264,9 +268,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 bambuModelId={state.currentBambuModelId}
                 currentPlateIndex={state.currentPlateIndex ?? null}
                 onUploaded={() => {
-                  // Hard reload pra forçar RealisticPreview3D buscar o
-                  // mesh recém-uploadado (key prop também muda).
-                  window.location.reload();
+                  // Bump versão pro PrintPreview re-buscar o mesh
+                  // (sem perder logs do DevTools).
+                  setCachedVersion((v) => v + 1);
                 }}
               />
             ) : null}
