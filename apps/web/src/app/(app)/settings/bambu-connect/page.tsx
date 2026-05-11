@@ -19,7 +19,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { getApiBase } from '@/lib/bridge-url';
 
 type Step = 'loading' | 'connected' | 'email' | 'code' | 'success';
 
@@ -56,12 +55,11 @@ export default function BambuConnectPage() {
   const [devices, setDevices] = useState<BambuDevice[]>([]);
   const [status, setStatus] = useState<BambuConnectionStatus | null>(null);
   const [pending, start] = useTransition();
-  const apiBase = getApiBase();
 
   // Carrega status atual ao montar (se já tem conta conectada, mostra direto)
   useEffect(() => {
     let cancelled = false;
-    fetch(`${apiBase}/api/bambu/status`, { credentials: 'include' })
+    fetch(`/api/bambu/status`, { credentials: 'include' })
       .then((res) => (res.ok ? (res.json() as Promise<BambuConnectionStatus>) : null))
       .then((data) => {
         if (cancelled) return;
@@ -74,7 +72,7 @@ export default function BambuConnectPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiBase]);
+  }, []);
 
   function reset() {
     setStep('email');
@@ -86,7 +84,7 @@ export default function BambuConnectPage() {
   function disconnect() {
     if (!confirm('Remover a conta Bambu Cloud vinculada? O worker para de receber telemetria.')) return;
     start(async () => {
-      const res = await fetch(`${apiBase}/api/bambu/connection`, {
+      const res = await fetch(`/api/bambu/connection`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -108,7 +106,7 @@ export default function BambuConnectPage() {
       return;
     }
     start(async () => {
-      const res = await fetch(`${apiBase}/api/bambu/send-code`, {
+      const res = await fetch(`/api/bambu/send-code`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -131,7 +129,7 @@ export default function BambuConnectPage() {
       return;
     }
     start(async () => {
-      const res = await fetch(`${apiBase}/api/bambu/verify-code`, {
+      const res = await fetch(`/api/bambu/verify-code`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
