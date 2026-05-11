@@ -215,7 +215,11 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
         </div>
 
         {printing ? (
-          hasUploadedModel ? (
+          hasUploadedModel || state?.currentTaskPickUrl ? (
+            // Renderiza preview 3D quando: (a) user uploadou .3mf (mesh
+            // rotacionável) ou (b) Bambu Cloud forneceu vista isométrica
+            // pra esse print (Story 4.7 — pick_1.png). O componente
+            // decide internamente qual mostrar.
             <RealisticPreview3D
               printerId={printerId}
               currentLayer={state?.currentLayer ?? null}

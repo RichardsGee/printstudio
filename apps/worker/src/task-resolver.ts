@@ -33,18 +33,23 @@ interface TaskApiResponse {
     deviceId?: string;
     cover?: string;
     title?: string;
+    plateIndex?: number;
     startTime?: string;
   }>;
+}
+
+interface TaskDetailPlate {
+  index?: number;
+  name?: string;
+  thumbnail?: { url?: string };
+  top_picture?: { url?: string };
+  pick_picture?: { url?: string };
 }
 
 interface TaskDetailResponse {
   model_id?: string;
   context?: {
-    plates?: Array<{
-      thumbnail?: { url?: string };
-      top_picture?: { url?: string };
-      pick_picture?: { url?: string };
-    }>;
+    plates?: TaskDetailPlate[];
   };
 }
 
@@ -117,7 +122,12 @@ export class TaskResolver {
       if (detailRes.ok) {
         const detail = (await detailRes.json()) as TaskDetailResponse;
         modelId = modelId ?? detail.model_id ?? null;
-        const plate = detail.context?.plates?.[0];
+        // Um .3mf pode ter múltiplos plates. O tasklist diz qual está
+        // sendo impresso via `plateIndex` (1-based). Filtra detail.plates
+        // por index; fallback pro primeiro plate se não bater (raro).
+        const wantPlateIndex = task.plateIndex ?? 1;
+        const plates = detail.context?.plates ?? [];
+        const plate = plates.find((p) => p.index === wantPlateIndex) ?? plates[0];
         topUrl = plate?.top_picture?.url ?? null;
         pickUrl = plate?.pick_picture?.url ?? null;
       } else {

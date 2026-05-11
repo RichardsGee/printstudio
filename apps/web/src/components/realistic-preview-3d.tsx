@@ -644,10 +644,11 @@ export function RealisticPreview3D({
       ) : null}
 
       {status !== 'ok' ? (
-        status === 'no-model' && cloudPickUrl ? (
+        cloudPickUrl ? (
           // Story 4.7: fallback automático com pick_1.png da Bambu Cloud
           // (vista isométrica). Sem rotação, mas visualmente real do print
-          // atual — sem precisar de upload manual.
+          // atual — sem precisar de upload manual. Aparece IMEDIATAMENTE
+          // (sem esperar fetch do .3mf timeout) quando temos URL cloud.
           <div className="absolute inset-0 bg-gradient-to-b from-[#0a0f1c] to-[#020409]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
