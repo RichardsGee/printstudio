@@ -434,7 +434,11 @@ function parsePlateFromBambu3mf(
     });
     if (objId && instId >= 0) refs.push({ objectId: objId, instanceId: instId });
   });
-  console.log(`[3mf] model_instances do plate ${plateIndex}:`, refs);
+  console.log(`[3mf] model_instances do plate ${plateIndex}: ${refs.length} refs`, refs);
+  console.log(
+    `[3mf] XML do plate ${plateIndex} (primeiros 2KB):\n`,
+    new XMLSerializer().serializeToString(targetPlate as Element).slice(0, 2000),
+  );
   if (refs.length === 0) {
     console.warn(`[3mf] plate ${plateIndex} sem model_instances`);
     return null;
