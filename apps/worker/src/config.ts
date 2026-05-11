@@ -1,4 +1,11 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+// Em dev, lê o .env do raiz do monorepo (mesmo padrão do api/bridge).
+// Em prod, o EasyPanel passa env vars direto no container, então este
+// load no-op falha silenciosamente.
+loadEnv({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../../.env') });
+
 import { z } from 'zod';
 
 const ConfigSchema = z.object({
