@@ -1,14 +1,13 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
-import './kiosk-theme.css';
+import { AppHeader } from '@/components/app-header';
 
 /**
- * Layout do modo kiosk — sem header, sem nav, fullscreen.
- * Pensado para monitor de parede / tablet fixo. Mantém auth
- * (sessão de 30 dias do NextAuth absorve a falta de relogin).
+ * Layout do modo kiosk — header global + área fullscreen pro grid de
+ * impressoras. Pensado pra monitor de parede / tablet fixo.
  *
- * Aplica o tema "Mission Mode" (kiosk-theme.css) — visual de
- * Mission Control com grid bg, scanlines, monospace, cyan accent.
+ * O tema Mission Control é aplicado globalmente via <body class="kiosk-mission">
+ * em app/layout.tsx — não precisa wrapper extra aqui.
  */
 export default async function KioskLayout({
   children,
@@ -18,5 +17,10 @@ export default async function KioskLayout({
   const session = await auth();
   if (!session?.user) redirect('/login?callbackUrl=/kiosk');
 
-  return <div className="kiosk-mission min-h-dvh">{children}</div>;
+  return (
+    <div className="min-h-dvh flex flex-col">
+      <AppHeader userEmail={session.user.email} />
+      <main className="flex-1">{children}</main>
+    </div>
+  );
 }
