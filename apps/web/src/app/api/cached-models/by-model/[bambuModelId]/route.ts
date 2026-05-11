@@ -14,7 +14,7 @@ import { cachedModels } from '@printstudio/db';
 import { getDb, getSessionUser, resolveUserOrganizationId } from '@/lib/bambu-api-helpers';
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ bambuModelId: string }> },
 ) {
   const user = await getSessionUser();
@@ -26,10 +26,17 @@ export async function GET(
   }
 
   const { bambuModelId } = await params;
+  const url = new URL(req.url);
+  const plateParam = url.searchParams.get('plate');
+  const plateIndex = plateParam ? parseInt(plateParam, 10) : 1;
+  if (!Number.isFinite(plateIndex) || plateIndex < 1) {
+    return NextResponse.json({ error: 'invalid plate' }, { status: 400 });
+  }
 
   const rows = await getDb()
     .select({
       id: cachedModels.id,
+      plateIndex: cachedModels.plateIndex,
       filename: cachedModels.filename,
       sizeBytes: cachedModels.sizeBytes,
       meshPayload: cachedModels.meshPayload,
@@ -39,6 +46,7 @@ export async function GET(
       and(
         eq(cachedModels.organizationId, organizationId),
         eq(cachedModels.bambuModelId, bambuModelId),
+        eq(cachedModels.plateIndex, plateIndex),
       ),
     )
     .limit(1);
@@ -50,6 +58,7 @@ export async function GET(
 
   return NextResponse.json({
     id: row.id,
+    plateIndex: row.plateIndex,
     filename: row.filename,
     sizeBytes: row.sizeBytes,
     meshPayload: row.meshPayload,

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from 'react';
 import * as THREE from 'three';
 import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
+import { unzipSync, strFromU8 } from 'fflate';
 import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -10,24 +11,27 @@ import type { CachedModelUploadRequest } from '@printstudio/shared';
 
 interface Props {
   bambuModelId: string;
-  /** Callback após upload bem-sucedido — usado pra refresh do RealisticPreview3D. */
+  /** Callback após upload bem-sucedido. */
   onUploaded?: () => void;
   className?: string;
 }
 
+interface PlateMesh {
+  plateIndex: number;
+  vertices: number[];
+  indices: number[];
+}
+
 /**
- * Botão "Vincular .3mf a este modelo" (Story 4.8).
+ * Botão "Vincular .3mf" (Story 4.8/4.9).
  *
- * Quando o user seleciona um .3mf, parseia o arquivo no client usando
- * Three.js ThreeMFLoader, extrai os meshes de TODOS os objetos do
- * modelo, combina em um único BufferGeometry, e envia o JSON
- * (vertices+indices) pro endpoint /api/cached-models.
+ * Lê o .3mf como ZIP via fflate, extrai a estrutura de plates do
+ * Metadata/model_settings.config (XML proprietário Bambu), e gera 1
+ * mesh por plate filtrando os objetos no Group do ThreeMFLoader pelo
+ * objectId.
  *
- * O server só armazena — não precisa ter parser .3mf no Node.
- *
- * Após upload, futuras impressões deste bambuModelId reusam o mesh
- * automaticamente no RealisticPreview3D (mesh rotacionável real,
- * não o pick_1.png isométrico estático).
+ * Faz POST sequencial pra /api/cached-models — 1 por plate.
+ * Próximas impressões do mesmo modelo+plate reusam o mesh sem upload.
  */
 export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,8 +45,7 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    e.target.value = ''; // permite re-selecionar mesmo arquivo
-
+    e.target.value = '';
     if (!file.name.toLowerCase().endsWith('.3mf')) {
       toast.error('Apenas arquivos .3mf são suportados');
       return;
@@ -53,29 +56,40 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
         setProgress('Lendo arquivo…');
         const buffer = await file.arrayBuffer();
 
-        setProgress('Parseando mesh 3D…');
-        const meshPayload = await parseThreeMF(buffer);
-
-        setProgress('Enviando…');
-        const payload: CachedModelUploadRequest = {
-          bambuModelId,
-          filename: file.name,
-          sizeBytes: file.size,
-          meshPayload,
-        };
-        const res = await fetch('/api/cached-models', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(`upload falhou (${res.status}): ${txt.slice(0, 120)}`);
+        setProgress('Parseando plates…');
+        const plates = await parsePlates(buffer);
+        if (plates.length === 0) {
+          throw new Error('Nenhum plate com mesh encontrado no .3mf');
         }
 
+        for (let i = 0; i < plates.length; i++) {
+          const plate = plates[i]!;
+          setProgress(`Enviando plate ${i + 1}/${plates.length}…`);
+          const payload: CachedModelUploadRequest = {
+            bambuModelId,
+            plateIndex: plate.plateIndex,
+            filename: file.name,
+            sizeBytes: file.size,
+            meshPayload: {
+              vertices: plate.vertices,
+              indices: plate.indices,
+            },
+          };
+          const res = await fetch('/api/cached-models', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`upload plate ${plate.plateIndex} falhou: ${txt.slice(0, 120)}`);
+          }
+        }
+
+        const totalVerts = plates.reduce((s, p) => s + p.vertices.length / 3, 0);
         toast.success(
-          `Vinculado: ${file.name} (${(meshPayload.vertices.length / 3).toLocaleString('pt-BR')} vértices)`,
+          `Vinculado: ${plates.length} plate(s) · ${totalVerts.toLocaleString('pt-BR')} vértices`,
         );
         onUploaded?.();
       } catch (err) {
@@ -116,55 +130,122 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
 }
 
 /**
- * Parseia um .3mf em ArrayBuffer e retorna mesh combinado em JSON.
- *
- * ThreeMFLoader devolve um Group com N children (cada um = um object
- * do .3mf). Iteramos pra coletar TODOS os geometries — ignora plates
- * (no MVP, todos plates compõem um único mesh visual).
+ * Parseia um .3mf e retorna array de meshes (1 por plate). Usa fflate
+ * pra ler o ZIP, ThreeMFLoader pra montar as geometrias com
+ * transformações, e parseia Metadata/model_settings.config pra mapear
+ * plate_id → object_ids.
  */
-async function parseThreeMF(buffer: ArrayBuffer): Promise<{ vertices: number[]; indices: number[] }> {
+async function parsePlates(buffer: ArrayBuffer): Promise<PlateMesh[]> {
+  const uint8 = new Uint8Array(buffer);
+  const files = unzipSync(uint8);
+
+  // Carrega tudo com ThreeMFLoader pra ter geometrias com transform aplicado
   const loader = new ThreeMFLoader();
   const group = loader.parse(buffer);
 
-  const allVertices: number[] = [];
-  const allIndices: number[] = [];
-  let vertexOffset = 0;
-
+  // Coleta meshes por objectId
+  const meshesByObjectId = new Map<string, THREE.Mesh[]>();
   group.traverse((obj: THREE.Object3D) => {
     if (!(obj instanceof THREE.Mesh)) return;
-    const geom = obj.geometry as THREE.BufferGeometry;
-    if (!geom) return;
-
-    // Aplica transformação do object (pose no plate)
-    obj.updateMatrixWorld(true);
-    const matrix = obj.matrixWorld;
-
-    const posAttr = geom.getAttribute('position');
-    if (!posAttr) return;
-    const tempVec = new THREE.Vector3();
-    for (let i = 0; i < posAttr.count; i++) {
-      tempVec.fromBufferAttribute(posAttr as THREE.BufferAttribute, i);
-      tempVec.applyMatrix4(matrix);
-      allVertices.push(tempVec.x, tempVec.y, tempVec.z);
-    }
-
-    const idx = geom.getIndex();
-    if (idx) {
-      for (let i = 0; i < idx.count; i++) {
-        allIndices.push(idx.getX(i) + vertexOffset);
-      }
-    } else {
-      // Geometry sem index — assume triângulos sequenciais
-      for (let i = 0; i < posAttr.count; i++) {
-        allIndices.push(i + vertexOffset);
-      }
-    }
-    vertexOffset += posAttr.count;
+    const objectId = String(obj.userData?.objectId ?? obj.userData?.id ?? '');
+    if (!objectId) return;
+    const list = meshesByObjectId.get(objectId) ?? [];
+    list.push(obj);
+    meshesByObjectId.set(objectId, list);
   });
 
-  if (allVertices.length === 0) {
-    throw new Error('Nenhum mesh encontrado no .3mf');
+  // Lê model_settings.config (Bambu proprietary XML) pra mapear plates
+  const settingsRaw = files['Metadata/model_settings.config'];
+  const platesMap = settingsRaw
+    ? parsePlatesFromSettings(strFromU8(settingsRaw))
+    : null;
+
+  if (!platesMap || platesMap.size === 0) {
+    // Sem metadados de plate — combina tudo num plate único (fallback)
+    const combined = combineMeshes(Array.from(meshesByObjectId.values()).flat());
+    return combined ? [{ plateIndex: 1, ...combined }] : [];
   }
 
-  return { vertices: allVertices, indices: allIndices };
+  const result: PlateMesh[] = [];
+  for (const [plateIndex, objectIds] of platesMap.entries()) {
+    const meshes: THREE.Mesh[] = [];
+    for (const oid of objectIds) {
+      const list = meshesByObjectId.get(oid);
+      if (list) meshes.push(...list);
+    }
+    const combined = combineMeshes(meshes);
+    if (combined) {
+      result.push({ plateIndex, ...combined });
+    }
+  }
+  return result.sort((a, b) => a.plateIndex - b.plateIndex);
+}
+
+/**
+ * Parsea Bambu model_settings.config (XML) pra extrair plate_id → [object_ids].
+ *
+ * Estrutura típica:
+ *   <plate>
+ *     <metadata key="plate_id" value="1"/>
+ *     <model_instance>
+ *       <metadata key="object_id" value="2"/>
+ *     </model_instance>
+ *   </plate>
+ */
+function parsePlatesFromSettings(xml: string): Map<number, string[]> {
+  const result = new Map<number, string[]>();
+  if (typeof window === 'undefined' || !window.DOMParser) return result;
+
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const plates = doc.querySelectorAll('plate');
+  plates.forEach((plate) => {
+    let plateId: number | null = null;
+    plate.querySelectorAll(':scope > metadata').forEach((m) => {
+      if (m.getAttribute('key') === 'plate_id') {
+        const v = parseInt(m.getAttribute('value') ?? '', 10);
+        if (Number.isFinite(v)) plateId = v;
+      }
+    });
+    if (plateId === null) return;
+    const objectIds: string[] = [];
+    plate.querySelectorAll('model_instance > metadata').forEach((m) => {
+      if (m.getAttribute('key') === 'object_id') {
+        const v = m.getAttribute('value');
+        if (v) objectIds.push(v);
+      }
+    });
+    if (objectIds.length > 0) result.set(plateId, objectIds);
+  });
+  return result;
+}
+
+function combineMeshes(meshes: THREE.Mesh[]): { vertices: number[]; indices: number[] } | null {
+  const vertices: number[] = [];
+  const indices: number[] = [];
+  let offset = 0;
+  const tempVec = new THREE.Vector3();
+
+  for (const mesh of meshes) {
+    const geom = mesh.geometry as THREE.BufferGeometry;
+    if (!geom) continue;
+    mesh.updateMatrixWorld(true);
+    const matrix = mesh.matrixWorld;
+    const pos = geom.getAttribute('position');
+    if (!pos) continue;
+    for (let i = 0; i < pos.count; i++) {
+      tempVec.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+      tempVec.applyMatrix4(matrix);
+      vertices.push(tempVec.x, tempVec.y, tempVec.z);
+    }
+    const idx = geom.getIndex();
+    if (idx) {
+      for (let i = 0; i < idx.count; i++) indices.push(idx.getX(i) + offset);
+    } else {
+      for (let i = 0; i < pos.count; i++) indices.push(i + offset);
+    }
+    offset += pos.count;
+  }
+
+  if (vertices.length === 0) return null;
+  return { vertices, indices };
 }

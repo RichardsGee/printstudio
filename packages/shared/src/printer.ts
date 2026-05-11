@@ -88,6 +88,7 @@ export const PrinterStateSchema = z.object({
    *  quando a impressora está imprimindo um print da cloud — vem do
    *  endpoint /v1/user-service/my/tasks. */
   currentBambuModelId: z.string().nullable().optional(),  // ex: "US547dc630b5cec1"
+  currentPlateIndex: z.number().int().nullable().optional(), // 1-based; plate atual
   currentTaskCoverUrl: z.string().nullable().optional(),  // Metadata/plate_1.png
   currentTaskTopUrl: z.string().nullable().optional(),    // Metadata/top_1.png
   currentTaskPickUrl: z.string().nullable().optional(),   // Metadata/pick_1.png — vista isométrica

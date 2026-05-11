@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'no organization' }, { status: 500 });
   }
 
-  const { bambuModelId, filename, sizeBytes, meshPayload } = parsed.data;
+  const { bambuModelId, plateIndex, filename, sizeBytes, meshPayload } = parsed.data;
   const now = new Date();
 
   const inserted = await getDb()
@@ -43,12 +43,13 @@ export async function POST(req: Request) {
     .values({
       organizationId,
       bambuModelId,
+      plateIndex,
       filename,
       sizeBytes,
       meshPayload,
     })
     .onConflictDoUpdate({
-      target: [cachedModels.organizationId, cachedModels.bambuModelId],
+      target: [cachedModels.organizationId, cachedModels.bambuModelId, cachedModels.plateIndex],
       set: {
         filename,
         sizeBytes,
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
   const response: CachedModelResponse = {
     id: row.id,
     bambuModelId: row.bambuModelId,
+    plateIndex: row.plateIndex,
     filename: row.filename,
     sizeBytes: row.sizeBytes,
     createdAt: row.createdAt.toISOString(),

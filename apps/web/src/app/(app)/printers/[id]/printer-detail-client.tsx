@@ -284,6 +284,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 filamentColor={activeSlot?.color ?? null}
                 cloudPickUrl={state?.currentTaskPickUrl ?? null}
                 cloudBambuModelId={state?.currentBambuModelId ?? null}
+                cloudPlateIndex={state?.currentPlateIndex ?? null}
               />
 
               <div className="min-w-0 space-y-2">

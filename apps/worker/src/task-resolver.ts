@@ -20,6 +20,7 @@ const HTTP_HEADERS = {
 
 export interface TaskPreview {
   bambuModelId: string | null;
+  plateIndex: number | null;
   coverUrl: string | null;
   topUrl: string | null;
   pickUrl: string | null;
@@ -55,6 +56,7 @@ interface TaskDetailResponse {
 
 const EMPTY: TaskPreview = {
   bambuModelId: null,
+  plateIndex: null,
   coverUrl: null,
   topUrl: null,
   pickUrl: null,
@@ -136,6 +138,7 @@ export class TaskResolver {
 
       const preview: TaskPreview = {
         bambuModelId: modelId,
+        plateIndex: task.plateIndex ?? null,
         coverUrl: task.cover ?? null,
         topUrl,
         pickUrl,

@@ -53,6 +53,8 @@ interface Props {
    *  tenta buscar mesh cached via /api/cached-models/by-model/{id}
    *  ANTES de cair pro bridge LAN. */
   cloudBambuModelId?: string | null;
+  /** Plate atual sendo impresso (Story 4.9). Default 1. */
+  cloudPlateIndex?: number | null;
   className?: string;
 }
 
@@ -225,6 +227,7 @@ export function RealisticPreview3D({
   accentColor,
   cloudPickUrl,
   cloudBambuModelId,
+  cloudPlateIndex,
   className,
 }: Props) {
   const [mesh, setMesh] = useState<MeshPayload | null>(null);
@@ -242,10 +245,12 @@ export function RealisticPreview3D({
     setStatus('loading');
     setMesh(null);
 
+    const plate = cloudPlateIndex && cloudPlateIndex > 0 ? cloudPlateIndex : 1;
     const tryCloud = cloudBambuModelId
-      ? fetch(`/api/cached-models/by-model/${encodeURIComponent(cloudBambuModelId)}`, {
-          credentials: 'include',
-        }).then(async (r) => {
+      ? fetch(
+          `/api/cached-models/by-model/${encodeURIComponent(cloudBambuModelId)}?plate=${plate}`,
+          { credentials: 'include' },
+        ).then(async (r) => {
           if (r.status === 404) return null;
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const data = (await r.json()) as { meshPayload: MeshPayload };
@@ -282,7 +287,7 @@ export function RealisticPreview3D({
     return () => {
       alive = false;
     };
-  }, [printerId, cloudBambuModelId]);
+  }, [printerId, cloudBambuModelId, cloudPlateIndex]);
 
   // Setup da cena (única por mesh).
   useEffect(() => {

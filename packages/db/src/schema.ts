@@ -146,6 +146,7 @@ export const printerState = pgTable('printer_state', {
   printErrorCode: integer('print_error_code'),
   stateChangeReason: text('state_change_reason'),
   currentBambuModelId: text('current_bambu_model_id'),
+  currentPlateIndex: integer('current_plate_index'),
   currentTaskCoverUrl: text('current_task_cover_url'),
   currentTaskTopUrl: text('current_task_top_url'),
   currentTaskPickUrl: text('current_task_pick_url'),
@@ -260,6 +261,7 @@ export const cachedModels = pgTable(
       .references(() => organizations.id, { onDelete: 'cascade' })
       .notNull(),
     bambuModelId: text('bambu_model_id').notNull(),
+    plateIndex: integer('plate_index').notNull().default(1),
     filename: text('filename').notNull(),
     sizeBytes: integer('size_bytes').notNull(),
     // { vertices: number[], indices: number[] } — pré-parsed
@@ -268,7 +270,11 @@ export const cachedModels = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
-    uqOrgModel: unique('cached_models_org_model_unique').on(t.organizationId, t.bambuModelId),
+    uqOrgModelPlate: unique('cached_models_org_model_plate_unique').on(
+      t.organizationId,
+      t.bambuModelId,
+      t.plateIndex,
+    ),
   }),
 );
 

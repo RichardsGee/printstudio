@@ -21,6 +21,8 @@ interface Props {
    *  RealisticPreview3D busca mesh em /api/cached-models antes do
    *  bridge LAN. */
   cloudBambuModelId?: string | null;
+  /** Story 4.9: plate atual sendo impresso (1-based). */
+  cloudPlateIndex?: number | null;
   className?: string;
 }
 
@@ -42,6 +44,7 @@ export function PrintPreview({
   filamentColor,
   cloudPickUrl,
   cloudBambuModelId,
+  cloudPlateIndex,
   className,
 }: Props) {
   const [mode, setMode] = useState<Mode>('thumbnail');
@@ -88,6 +91,7 @@ export function PrintPreview({
           filamentColor={filamentColor}
           cloudPickUrl={cloudPickUrl}
           cloudBambuModelId={cloudBambuModelId}
+          cloudPlateIndex={cloudPlateIndex}
           className="aspect-square"
         />
       )}

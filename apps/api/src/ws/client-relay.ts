@@ -51,6 +51,7 @@ async function loadSnapshot(printerIds: string[]): Promise<PrinterState[]> {
     printErrorCode: r.printErrorCode,
     stateChangeReason: r.stateChangeReason,
     currentBambuModelId: r.currentBambuModelId,
+    currentPlateIndex: r.currentPlateIndex,
     currentTaskCoverUrl: r.currentTaskCoverUrl,
     currentTaskTopUrl: r.currentTaskTopUrl,
     currentTaskPickUrl: r.currentTaskPickUrl,

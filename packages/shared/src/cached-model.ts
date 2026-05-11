@@ -16,6 +16,7 @@ export type MeshPayload = z.infer<typeof MeshPayloadSchema>;
 
 export const CachedModelUploadRequestSchema = z.object({
   bambuModelId: z.string().min(1).max(64),
+  plateIndex: z.number().int().positive().default(1),
   filename: z.string().min(1).max(256),
   sizeBytes: z.number().int().nonnegative(),
   meshPayload: MeshPayloadSchema,
@@ -25,6 +26,7 @@ export type CachedModelUploadRequest = z.infer<typeof CachedModelUploadRequestSc
 export const CachedModelResponseSchema = z.object({
   id: z.string().uuid(),
   bambuModelId: z.string(),
+  plateIndex: z.number().int(),
   filename: z.string(),
   sizeBytes: z.number().int(),
   createdAt: z.string(),

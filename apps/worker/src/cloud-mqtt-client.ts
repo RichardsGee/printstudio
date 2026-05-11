@@ -108,6 +108,7 @@ export class CloudMqttClient extends EventEmitter {
         }
         const preview = this.opts.taskResolver.get(printerId);
         next.currentBambuModelId = preview.bambuModelId;
+        next.currentPlateIndex = preview.plateIndex;
         next.currentTaskCoverUrl = preview.coverUrl;
         next.currentTaskTopUrl = preview.topUrl;
         next.currentTaskPickUrl = preview.pickUrl;
