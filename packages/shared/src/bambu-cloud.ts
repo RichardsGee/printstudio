@@ -47,6 +47,23 @@ export type BambuVerifyCodeResponse = z.infer<typeof BambuVerifyCodeResponseSche
  * Erros possíveis (códigos discriminados) retornados pela api.
  * UI usa pra dar mensagem específica em cada caso.
  */
+/**
+ * Status atual da conexão Bambu da organização do user (GET /api/bambu/status).
+ */
+export const BambuConnectionStatusSchema = z.discriminatedUnion('connected', [
+  z.object({
+    connected: z.literal(false),
+  }),
+  z.object({
+    connected: z.literal(true),
+    bambuEmail: z.string(),
+    bambuUserId: z.string(),
+    expiresAt: z.string(), // ISO
+    lastSyncedAt: z.string().nullable(),
+  }),
+]);
+export type BambuConnectionStatus = z.infer<typeof BambuConnectionStatusSchema>;
+
 export const BambuErrorCodeSchema = z.enum([
   'BAMBU_VERIFY_REQUIRED', // login retornou loginType: verifyCode (sem code passado)
   'BAMBU_TFA_REQUIRED', // login retornou loginType: tfa (2FA, não suportado)

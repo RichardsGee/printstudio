@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import type {
+  BambuConnectionStatus,
   BambuDevice,
   BambuErrorCode,
   BambuVerifyCodeResponse,
@@ -20,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { getApiBase } from '@/lib/bridge-url';
 
-type Step = 'email' | 'code' | 'success';
+type Step = 'loading' | 'connected' | 'email' | 'code' | 'success';
 
 interface ErrorBody {
   error: { code: BambuErrorCode; message: string };
@@ -49,18 +50,54 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export default function BambuConnectPage() {
-  const [step, setStep] = useState<Step>('email');
+  const [step, setStep] = useState<Step>('loading');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [devices, setDevices] = useState<BambuDevice[]>([]);
+  const [status, setStatus] = useState<BambuConnectionStatus | null>(null);
   const [pending, start] = useTransition();
   const apiBase = getApiBase();
+
+  // Carrega status atual ao montar (se já tem conta conectada, mostra direto)
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${apiBase}/api/bambu/status`, { credentials: 'include' })
+      .then((res) => (res.ok ? (res.json() as Promise<BambuConnectionStatus>) : null))
+      .then((data) => {
+        if (cancelled) return;
+        setStatus(data);
+        setStep(data?.connected ? 'connected' : 'email');
+      })
+      .catch(() => {
+        if (!cancelled) setStep('email');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
 
   function reset() {
     setStep('email');
     setEmail('');
     setCode('');
     setDevices([]);
+  }
+
+  function disconnect() {
+    if (!confirm('Remover a conta Bambu Cloud vinculada? O worker para de receber telemetria.')) return;
+    start(async () => {
+      const res = await fetch(`${apiBase}/api/bambu/connection`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        toast.error('Falhou ao desconectar');
+        return;
+      }
+      toast.success('Conta Bambu desconectada');
+      setStatus({ connected: false });
+      reset();
+    });
   }
 
   function sendCode(e: React.FormEvent) {
@@ -120,6 +157,66 @@ export default function BambuConnectPage() {
           nuvem da Bambu, sem precisar de um bridge LAN.
         </p>
       </div>
+
+      {step === 'loading' && (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            Carregando status da conexão…
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'connected' && status?.connected && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Conta Bambu conectada ✓</CardTitle>
+            <CardDescription>
+              Esta organização já está vinculada a uma conta Bambu Cloud. O worker
+              recebe telemetria automaticamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-md border p-3 space-y-1 text-sm">
+              <div>
+                <span className="text-muted-foreground">Email Bambu:</span>{' '}
+                <strong>{status.bambuEmail}</strong>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Bambu user ID:</span>{' '}
+                <code className="font-mono text-xs">{status.bambuUserId}</code>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Token expira em:</span>{' '}
+                {new Date(status.expiresAt).toLocaleString('pt-BR')}
+              </div>
+              {status.lastSyncedAt && (
+                <div>
+                  <span className="text-muted-foreground">Sincronizado em:</span>{' '}
+                  {new Date(status.lastSyncedAt).toLocaleString('pt-BR')}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={reset}
+                disabled={pending}
+              >
+                Reconectar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={disconnect}
+                disabled={pending}
+              >
+                Desconectar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {step === 'email' && (
         <Card>

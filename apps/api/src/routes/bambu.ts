@@ -14,6 +14,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import {
   BambuSendCodeRequestSchema,
   BambuVerifyCodeRequestSchema,
+  type BambuConnectionStatus,
   type BambuDevice,
   type BambuErrorCode,
   type BambuVerifyCodeResponse,
@@ -51,6 +52,59 @@ async function resolveUserOrganizationId(userId: string): Promise<string | null>
 
 export async function registerBambuRoutes(app: FastifyInstance): Promise<void> {
   const credKey = parseKey(config.BAMBU_CRED_KEY);
+
+  app.get(
+    '/api/bambu/status',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const userId = req.user!.id;
+      const organizationId = await resolveUserOrganizationId(userId);
+      if (!organizationId) {
+        const status: BambuConnectionStatus = { connected: false };
+        return reply.send(status);
+      }
+
+      const rows = await db
+        .select({
+          bambuEmail: bambuCredentials.bambuEmail,
+          bambuUserId: bambuCredentials.bambuUserId,
+          expiresAt: bambuCredentials.accessTokenExpiresAt,
+          lastSyncedAt: bambuCredentials.lastSyncedAt,
+        })
+        .from(bambuCredentials)
+        .where(eq(bambuCredentials.organizationId, organizationId))
+        .limit(1);
+
+      const row = rows[0];
+      const status: BambuConnectionStatus = row
+        ? {
+            connected: true,
+            bambuEmail: row.bambuEmail,
+            bambuUserId: row.bambuUserId,
+            expiresAt: row.expiresAt.toISOString(),
+            lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+          }
+        : { connected: false };
+      return reply.send(status);
+    },
+  );
+
+  app.delete(
+    '/api/bambu/connection',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const userId = req.user!.id;
+      const organizationId = await resolveUserOrganizationId(userId);
+      if (!organizationId) {
+        return reply.code(204).send();
+      }
+      await db
+        .delete(bambuCredentials)
+        .where(eq(bambuCredentials.organizationId, organizationId));
+      logger.info({ organizationId, userId }, 'bambu credentials removed');
+      return reply.code(204).send();
+    },
+  );
 
   app.post(
     '/api/bambu/send-code',
