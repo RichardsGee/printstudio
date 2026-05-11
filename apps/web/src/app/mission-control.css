@@ -1,8 +1,16 @@
 /* ==========================================================================
-   KIOSK MISSION MODE THEME
+   MISSION CONTROL THEME (PrintStudio global)
    --------------------------------------------------------------------------
    Tema sci-fi/comando — visual de Mission Control (NASA, governo, Matrix-ish).
-   Aplicar via wrapper com class="kiosk-mission".
+   Aplicado globalmente em <body class="kiosk-mission"> via app/layout.tsx
+   pra que todas as rotas (app, kiosk, login) herdem grid + monospace + cores.
+
+   Páginas que queiram embeddar o tema dentro de outro contexto (ex: showcase
+   no /design-system) devem usar o modificador .demo-mode pra desativar
+   pseudo-elementos fixed (scanlines, vinheta).
+
+   Classe principal: .kiosk-mission (mantida pelo nome histórico — não renomear
+   pra evitar quebrar overrides; tratá-la como "mission-control" semanticamente).
    --------------------------------------------------------------------------
 */
 
@@ -235,4 +243,3 @@
     brightness(0.7)
     contrast(1.15);
 }
-

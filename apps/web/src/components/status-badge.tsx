@@ -10,15 +10,20 @@ import {
   Loader2,
 } from 'lucide-react';
 
+/**
+ * Tags técnicas estilo telemetria — substituem nomes humanizados
+ * ("Imprimindo", "Concluído") por convenção de painel de comando.
+ * Sincronizado com STATUS_LABELS de kiosk-printer-card.tsx.
+ */
 const LABELS: Record<PrinterStatus, string> = {
-  IDLE: 'Ocioso',
-  PREPARE: 'Preparando',
-  PRINTING: 'Imprimindo',
-  PAUSED: 'Pausado',
-  FINISH: 'Concluído',
-  FAILED: 'Falhou',
-  OFFLINE: 'Offline',
-  UNKNOWN: 'Desconhecido',
+  IDLE: '[STBY]',
+  PREPARE: '[BOOT]',
+  PRINTING: '[ACTIVE]',
+  PAUSED: '[HOLD]',
+  FINISH: '[OK]',
+  FAILED: '[ERR]',
+  OFFLINE: '[NO-LINK]',
+  UNKNOWN: '[?]',
 };
 
 const VARIANTS: Record<
@@ -50,7 +55,7 @@ export function StatusBadge({ status }: { status: PrinterStatus }) {
   const Icon = ICONS[status];
   const spin = status === 'PREPARE';
   return (
-    <Badge variant={VARIANTS[status]} className="gap-1.5">
+    <Badge variant={VARIANTS[status]} className="gap-1.5 font-mono tracking-wider">
       <Icon className={`h-3 w-3 ${spin ? 'animate-spin' : ''}`} />
       {LABELS[status]}
     </Badge>
