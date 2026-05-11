@@ -15,7 +15,26 @@ FROM base AS builder
 WORKDIR /repo
 COPY --from=deps /repo ./
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter @printstudio/web build
+
+# Build args precisam ser declarados como ARG aqui pra Docker passar
+# os --build-arg do EasyPanel. Depois converte em ENV pro Next.js
+# embedar nos chunks JS no build estático.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
+ARG NEXT_PUBLIC_LAN_DISCOVERY_HOST
+ARG NEXT_PUBLIC_LAN_DISCOVERY_PORT
+ARG NEXT_PUBLIC_APP_NAME
+ARG GIT_SHA
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_LAN_DISCOVERY_HOST=$NEXT_PUBLIC_LAN_DISCOVERY_HOST
+ENV NEXT_PUBLIC_LAN_DISCOVERY_PORT=$NEXT_PUBLIC_LAN_DISCOVERY_PORT
+ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME
+
+# Invalida o cache da camada de build a cada novo commit, garantindo
+# que mudanças nas envs públicas sempre re-executem o `next build`.
+RUN echo "Building ${GIT_SHA:-unknown}" \
+ && pnpm --filter @printstudio/web build
 
 FROM base AS runner
 WORKDIR /app
