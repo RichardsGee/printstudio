@@ -398,18 +398,31 @@ function parsePlateFromBambu3mf(
   if (objects.size === 0 || buildItems.length === 0) return null;
 
   // 3. Acha o plate desejado em model_settings.config
+  // NÃO usa `:scope > metadata` — não funciona consistente em XML
+  // parseado por DOMParser. Itera children direto via Element API.
+  const directChildren = (el: Element, tag: string): Element[] => {
+    const out: Element[] = [];
+    for (let i = 0; i < el.children.length; i++) {
+      const c = el.children[i]!;
+      if (c.tagName === tag || c.tagName.toLowerCase() === tag.toLowerCase()) {
+        out.push(c);
+      }
+    }
+    return out;
+  };
+
   const allPlates = settingsDoc.querySelectorAll('plate');
   console.log(`[3mf] total plates em settings: ${allPlates.length}, buscando plate_id=${plateIndex}`);
   const platesFound: number[] = [];
   let targetPlate: Element | null = null;
   allPlates.forEach((p) => {
-    p.querySelectorAll(':scope > metadata').forEach((m) => {
+    for (const m of directChildren(p, 'metadata')) {
       if (m.getAttribute('key') === 'plate_id') {
         const v = Number(m.getAttribute('value'));
         platesFound.push(v);
         if (v === plateIndex && !targetPlate) targetPlate = p;
       }
-    });
+    }
   });
   console.log(`[3mf] plate_ids encontrados no settings:`, platesFound);
   if (!targetPlate) {
@@ -417,23 +430,23 @@ function parsePlateFromBambu3mf(
     return null;
   }
 
-  // 4. Lê os model_instances do plate
+  // 4. Lê os model_instances do plate (direct children of plate)
   interface InstanceRef {
     objectId: string;
     instanceId: number;
   }
   const refs: InstanceRef[] = [];
-  (targetPlate as Element).querySelectorAll('model_instance').forEach((mi) => {
+  for (const mi of directChildren(targetPlate as Element, 'model_instance')) {
     let objId = '';
     let instId = -1;
-    mi.querySelectorAll('metadata').forEach((m) => {
+    for (const m of directChildren(mi, 'metadata')) {
       const k = m.getAttribute('key');
       const v = m.getAttribute('value') ?? '';
       if (k === 'object_id') objId = v;
       else if (k === 'instance_id') instId = Number(v);
-    });
+    }
     if (objId && instId >= 0) refs.push({ objectId: objId, instanceId: instId });
-  });
+  }
   console.log(`[3mf] model_instances do plate ${plateIndex}: ${refs.length} refs`, refs);
   console.log(
     `[3mf] XML do plate ${plateIndex} (primeiros 2KB):\n`,
