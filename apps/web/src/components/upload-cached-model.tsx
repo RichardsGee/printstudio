@@ -143,41 +143,75 @@ async function parsePlates(buffer: ArrayBuffer): Promise<PlateMesh[]> {
   const loader = new ThreeMFLoader();
   const group = loader.parse(buffer);
 
-  // Coleta meshes por objectId
-  const meshesByObjectId = new Map<string, THREE.Mesh[]>();
+  // Coleta TODOS os meshes do Group, indexados de várias formas pra
+  // maximizar chance de match com object_id do model_settings.config.
+  // ThreeMFLoader (Three r184) é inconsistente sobre onde guarda o id
+  // do object original — às vezes em mesh.name, às vezes em userData.
+  const allMeshes: THREE.Mesh[] = [];
+  const meshById = new Map<string, THREE.Mesh[]>();
+  function indexBy(key: string | undefined | null, mesh: THREE.Mesh) {
+    if (!key) return;
+    const k = String(key);
+    const list = meshById.get(k) ?? [];
+    list.push(mesh);
+    meshById.set(k, list);
+  }
   group.traverse((obj: THREE.Object3D) => {
     if (!(obj instanceof THREE.Mesh)) return;
-    const objectId = String(obj.userData?.objectId ?? obj.userData?.id ?? '');
-    if (!objectId) return;
-    const list = meshesByObjectId.get(objectId) ?? [];
-    list.push(obj);
-    meshesByObjectId.set(objectId, list);
+    if (!obj.geometry || !obj.geometry.getAttribute('position')) return;
+    allMeshes.push(obj);
+    indexBy(obj.name, obj);
+    const ud = obj.userData ?? {};
+    indexBy(ud.objectId as string, obj);
+    indexBy(ud.id as string, obj);
+    indexBy(ud.componentId as string, obj);
   });
 
-  // Lê model_settings.config (Bambu proprietary XML) pra mapear plates
+  if (allMeshes.length === 0) {
+    throw new Error(
+      'ThreeMFLoader não retornou meshes — arquivo .3mf pode estar corrompido ou em formato não suportado',
+    );
+  }
+
+  // Tenta ler model_settings.config (Bambu proprietary) pra detectar plates
   const settingsRaw = files['Metadata/model_settings.config'];
   const platesMap = settingsRaw
     ? parsePlatesFromSettings(strFromU8(settingsRaw))
     : null;
 
+  // Fallback 1: sem mapping de plates ou mapping vazio → tudo vira plate 1
   if (!platesMap || platesMap.size === 0) {
-    // Sem metadados de plate — combina tudo num plate único (fallback)
-    const combined = combineMeshes(Array.from(meshesByObjectId.values()).flat());
-    return combined ? [{ plateIndex: 1, ...combined }] : [];
+    const combined = combineMeshes(allMeshes);
+    if (!combined) throw new Error('Falha ao combinar meshes (geometria vazia)');
+    return [{ plateIndex: 1, ...combined }];
   }
 
+  // Tenta gerar 1 mesh por plate usando object_ids do settings
   const result: PlateMesh[] = [];
+  let matchedAny = false;
   for (const [plateIndex, objectIds] of platesMap.entries()) {
-    const meshes: THREE.Mesh[] = [];
+    const seen = new Set<THREE.Mesh>();
     for (const oid of objectIds) {
-      const list = meshesByObjectId.get(oid);
-      if (list) meshes.push(...list);
+      const list = meshById.get(oid);
+      if (list) {
+        matchedAny = true;
+        list.forEach((m) => seen.add(m));
+      }
     }
-    const combined = combineMeshes(meshes);
-    if (combined) {
-      result.push({ plateIndex, ...combined });
+    if (seen.size > 0) {
+      const combined = combineMeshes(Array.from(seen));
+      if (combined) result.push({ plateIndex, ...combined });
     }
   }
+
+  // Fallback 2: mapping existe mas nenhum object_id casa com mesh
+  // (id desencontrado pelo loader) → tudo vira plate 1
+  if (!matchedAny || result.length === 0) {
+    const combined = combineMeshes(allMeshes);
+    if (!combined) throw new Error('Falha ao combinar meshes');
+    return [{ plateIndex: 1, ...combined }];
+  }
+
   return result.sort((a, b) => a.plateIndex - b.plateIndex);
 }
 
