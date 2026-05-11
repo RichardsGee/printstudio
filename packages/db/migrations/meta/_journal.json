@@ -50,6 +50,13 @@
       "when": 1778723500000,
       "tag": "0006_bambu_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778821000000,
+      "tag": "0007_printers_unique_org_serial",
+      "breakpoints": true
     }
   ]
 }

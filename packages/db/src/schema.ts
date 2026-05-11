@@ -87,20 +87,28 @@ export const organizationMembers = pgTable(
   }),
 );
 
-export const printers = pgTable('printers', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  organizationId: uuid('organization_id')
-    .references(() => organizations.id, { onDelete: 'cascade' })
-    .notNull()
-    .default(DEFAULT_ORG_ID),
-  name: text('name').notNull(),
-  serial: text('serial').notNull().unique(),
-  accessCode: text('access_code').notNull(),
-  ipAddress: inet('ip_address'),
-  model: text('model').default('A1').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+export const printers = pgTable(
+  'printers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull()
+      .default(DEFAULT_ORG_ID),
+    name: text('name').notNull(),
+    serial: text('serial').notNull(),
+    accessCode: text('access_code').notNull(),
+    ipAddress: inet('ip_address'),
+    model: text('model').default('A1').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    // Multi-tenant: serial é único POR ORG, não globalmente. Mesma física
+    // impressora pode aparecer em mais de uma org (1 linha por org).
+    uqOrgSerial: unique('printers_organization_id_serial_unique').on(t.organizationId, t.serial),
+  }),
+);
 
 export const printerState = pgTable('printer_state', {
   printerId: uuid('printer_id')
