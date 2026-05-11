@@ -294,9 +294,19 @@ function parsePlateFromBambu3mf(
   if (typeof window === 'undefined' || !window.DOMParser) return null;
   const files = unzipSync(new Uint8Array(buffer));
 
+  // DEBUG: lista arquivos do .3mf pra entender estrutura
+  console.log('[3mf] arquivos no zip:', Object.keys(files).slice(0, 20));
+
   const modelRaw = files['3D/3dmodel.model'];
   const settingsRaw = files['Metadata/model_settings.config'];
-  if (!modelRaw || !settingsRaw) return null;
+  if (!modelRaw) {
+    console.warn('[3mf] falta 3D/3dmodel.model');
+    return null;
+  }
+  if (!settingsRaw) {
+    console.warn('[3mf] falta Metadata/model_settings.config — Bambu não detectado');
+    return null;
+  }
 
   const parser = new DOMParser();
   const modelDoc = parser.parseFromString(strFromU8(modelRaw), 'application/xml');
@@ -344,22 +354,33 @@ function parsePlateFromBambu3mf(
     buildItems.push({ objectId, matrix: transform });
   });
 
+  console.log(`[3mf] objects: ${objects.size}, build items: ${buildItems.length}`);
+  console.log(
+    `[3mf] build items detail:`,
+    buildItems.slice(0, 10).map((b) => ({ objectId: b.objectId, tx: b.matrix.slice(9, 12) })),
+  );
+
   if (objects.size === 0 || buildItems.length === 0) return null;
 
   // 3. Acha o plate desejado em model_settings.config
+  const allPlates = settingsDoc.querySelectorAll('plate');
+  console.log(`[3mf] total plates em settings: ${allPlates.length}, buscando plate_id=${plateIndex}`);
+  const platesFound: number[] = [];
   let targetPlate: Element | null = null;
-  settingsDoc.querySelectorAll('plate').forEach((p) => {
-    if (targetPlate) return;
+  allPlates.forEach((p) => {
     p.querySelectorAll(':scope > metadata').forEach((m) => {
-      if (
-        m.getAttribute('key') === 'plate_id' &&
-        Number(m.getAttribute('value')) === plateIndex
-      ) {
-        targetPlate = p;
+      if (m.getAttribute('key') === 'plate_id') {
+        const v = Number(m.getAttribute('value'));
+        platesFound.push(v);
+        if (v === plateIndex && !targetPlate) targetPlate = p;
       }
     });
   });
-  if (!targetPlate) return null;
+  console.log(`[3mf] plate_ids encontrados no settings:`, platesFound);
+  if (!targetPlate) {
+    console.warn(`[3mf] plate ${plateIndex} NÃO encontrado no settings`);
+    return null;
+  }
 
   // 4. Lê os model_instances do plate
   interface InstanceRef {
@@ -378,7 +399,11 @@ function parsePlateFromBambu3mf(
     });
     if (objId && instId >= 0) refs.push({ objectId: objId, instanceId: instId });
   });
-  if (refs.length === 0) return null;
+  console.log(`[3mf] model_instances do plate ${plateIndex}:`, refs);
+  if (refs.length === 0) {
+    console.warn(`[3mf] plate ${plateIndex} sem model_instances`);
+    return null;
+  }
 
   // 5. Pra cada ref, encontra build item correto e aplica transform.
   // Tenta interpretar instance_id de 2 formas — primeiro como índice
@@ -397,13 +422,26 @@ function parsePlateFromBambu3mf(
   for (const ref of refs) {
     // Estratégia 1: instance_id como índice global
     let item: BuildItem | undefined = buildItems[ref.instanceId];
+    let strategy = 'global';
     if (!item || item.objectId !== ref.objectId) {
       // Estratégia 2: instance_id como índice dentro dos items do mesmo objectId
       item = itemsByObjectId.get(ref.objectId)?.[ref.instanceId];
+      strategy = 'per-objectId';
     }
-    if (!item) continue;
+    if (!item) {
+      console.warn(
+        `[3mf] ref (object_id=${ref.objectId}, instance_id=${ref.instanceId}) sem build item correspondente`,
+      );
+      continue;
+    }
     const obj = objects.get(item.objectId);
-    if (!obj) continue;
+    if (!obj) {
+      console.warn(`[3mf] objectId ${item.objectId} sem geometry`);
+      continue;
+    }
+    console.log(
+      `[3mf] aplicando build item: objectId=${item.objectId} via ${strategy}, tx=${item.matrix.slice(9, 12).join(',')}, verts=${obj.vertices.length / 3}`,
+    );
 
     const m = item.matrix;
     // 3MF transform: row-major; m[0..8] = rotação/escala 3x3, m[9..11] = translação
@@ -424,6 +462,12 @@ function parsePlateFromBambu3mf(
     vOffset += nVerts;
   }
 
-  if (allVerts.length === 0) return null;
+  if (allVerts.length === 0) {
+    console.warn('[3mf] parser plate-aware: 0 vértices coletados');
+    return null;
+  }
+  console.log(
+    `[3mf] parser plate-aware OK: ${allVerts.length / 3} vértices, ${allIdx.length / 3} triângulos`,
+  );
   return { vertices: allVerts, indices: allIdx };
 }
