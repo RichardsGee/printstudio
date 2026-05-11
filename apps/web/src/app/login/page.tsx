@@ -49,15 +49,24 @@ function LoginForm() {
 
   return (
     <div className="min-h-dvh grid place-items-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>PrintStudio</CardTitle>
-          <CardDescription>Acesse sua conta</CardDescription>
+      <Card data-mc-card className="w-full max-w-sm">
+        <CardHeader className="space-y-1">
+          <div data-mc-id className="text-caption uppercase tracking-widest text-primary">
+            {'// ACCESS-TERMINAL'}
+          </div>
+          <CardTitle className="text-heading uppercase tracking-wider">
+            PrintStudio
+          </CardTitle>
+          <CardDescription className="text-small">
+            Autentique-se para acessar o painel
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" data-mc-label className="uppercase tracking-wider text-caption">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -68,7 +77,9 @@ function LoginForm() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="password" data-mc-label className="uppercase tracking-wider text-caption">
+                Senha
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -78,8 +89,8 @@ function LoginForm() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? 'Entrando…' : 'Entrar'}
+            <Button type="submit" className="w-full uppercase tracking-wider" disabled={pending}>
+              {pending ? '[CONNECTING…]' : '[ENTRAR]'}
             </Button>
           </form>
         </CardContent>

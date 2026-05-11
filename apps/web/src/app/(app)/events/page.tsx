@@ -1,7 +1,8 @@
 import { desc, eq } from 'drizzle-orm';
 import { createDb, events, printers } from '@printstudio/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { SeverityBadge } from '@/components/severity-badge';
 import { formatDateTime } from '@/lib/utils';
 import { requireCurrentOrgId } from '@/lib/current-org';
 
@@ -25,28 +26,23 @@ async function loadEvents(organizationId: string) {
     .limit(200);
 }
 
-const SEVERITY_VARIANT = {
-  INFO: 'secondary',
-  WARN: 'warning',
-  ERROR: 'destructive',
-} as const;
-
 export default async function EventsPage() {
   const orgId = await requireCurrentOrgId();
   const rows = await loadEvents(orgId);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Eventos</h1>
-        <p className="text-sm text-muted-foreground">
-          Log de eventos do sistema
-        </p>
-      </div>
+      <PageHeader
+        id="EVENTS"
+        title="Eventos"
+        description="Log de eventos do sistema"
+      />
 
-      <Card>
+      <Card data-mc-card>
         <CardHeader>
-          <CardTitle className="text-base">{rows.length} eventos</CardTitle>
+          <CardTitle className="text-body">
+            <span data-mc-num>{rows.length}</span> eventos
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <ul className="divide-y divide-border/60">
@@ -55,23 +51,20 @@ export default async function EventsPage() {
                 key={ev.id}
                 className="flex items-start gap-3 p-4"
               >
-                <Badge
-                  variant={SEVERITY_VARIANT[ev.severity] ?? 'secondary'}
-                  className="shrink-0"
-                >
-                  {ev.severity}
-                </Badge>
+                <SeverityBadge severity={ev.severity} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm">{ev.message}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {ev.printerName ?? 'Sistema'} · {ev.type} ·{' '}
-                    {formatDateTime(ev.createdAt)}
+                  <div className="text-small">{ev.message}</div>
+                  <div className="text-caption text-muted-foreground mt-0.5">
+                    <span data-mc-id>
+                      {ev.printerName ?? 'SISTEMA'} · {ev.type}
+                    </span>{' '}
+                    · <span data-mc-num>{formatDateTime(ev.createdAt)}</span>
                   </div>
                 </div>
               </li>
             ))}
             {rows.length === 0 && (
-              <li className="text-center py-10 text-muted-foreground text-sm">
+              <li className="text-center py-10 text-muted-foreground text-small">
                 Sem eventos.
               </li>
             )}
