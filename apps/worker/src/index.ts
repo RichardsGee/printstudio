@@ -27,6 +27,7 @@ import { listBoundDevices } from './bambu-cloud-api.js';
 import { syncPrintersWithCloud, closeDb as closeRegistryDb } from './printer-registry.js';
 import { CloudMqttClient } from './cloud-mqtt-client.js';
 import { CloudRelay } from './cloud-relay.js';
+import { TaskResolver } from './task-resolver.js';
 
 async function main(): Promise<void> {
   logger.info(
@@ -86,11 +87,13 @@ async function main(): Promise<void> {
   const registered = await syncPrintersWithCloud(boundDevices);
   logger.info({ count: registered.length }, 'printers sync done');
 
+  const taskResolver = new TaskResolver(cred.accessToken, logger);
   const mqttClient = new CloudMqttClient({
     bambuUserId: cred.bambuUserId,
     accessToken: cred.accessToken,
     devices: registered,
     logger,
+    taskResolver,
   });
 
   const relay = new CloudRelay({

@@ -14,6 +14,9 @@ interface Props {
   totalLayers?: number | null;
   progressPct?: number | null;
   filamentColor?: string | null;
+  /** Story 4.7: vista isométrica (pick_1.png) da Bambu Cloud — fallback
+   *  no modo "Real" quando não há .3mf cached. */
+  cloudPickUrl?: string | null;
   className?: string;
 }
 
@@ -33,6 +36,7 @@ export function PrintPreview({
   totalLayers,
   progressPct,
   filamentColor,
+  cloudPickUrl,
   className,
 }: Props) {
   const [mode, setMode] = useState<Mode>('thumbnail');
@@ -77,6 +81,7 @@ export function PrintPreview({
           totalLayers={totalLayers}
           progressPct={progressPct}
           filamentColor={filamentColor}
+          cloudPickUrl={cloudPickUrl}
           className="aspect-square"
         />
       )}

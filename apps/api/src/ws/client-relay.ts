@@ -50,6 +50,10 @@ async function loadSnapshot(printerIds: string[]): Promise<PrinterState[]> {
     printType: r.printType,
     printErrorCode: r.printErrorCode,
     stateChangeReason: r.stateChangeReason,
+    currentBambuModelId: r.currentBambuModelId,
+    currentTaskCoverUrl: r.currentTaskCoverUrl,
+    currentTaskTopUrl: r.currentTaskTopUrl,
+    currentTaskPickUrl: r.currentTaskPickUrl,
     updatedAt: r.updatedAt.toISOString(),
   }));
 }

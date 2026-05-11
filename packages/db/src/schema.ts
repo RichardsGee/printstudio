@@ -145,6 +145,10 @@ export const printerState = pgTable('printer_state', {
   printType: text('print_type'),
   printErrorCode: integer('print_error_code'),
   stateChangeReason: text('state_change_reason'),
+  currentBambuModelId: text('current_bambu_model_id'),
+  currentTaskCoverUrl: text('current_task_cover_url'),
+  currentTaskTopUrl: text('current_task_top_url'),
+  currentTaskPickUrl: text('current_task_pick_url'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

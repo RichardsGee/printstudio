@@ -45,6 +45,10 @@ interface Props {
    *  Mission Mode passar '#22d3ee' (cyan) — separa visualmente o
    *  "real" (filamento) do "data overlay" (cyan). */
   accentColor?: string | null;
+  /** Fallback Bambu Cloud (Story 4.7): vista isométrica pré-renderizada
+   *  do print atual. Mostrada quando NÃO há .3mf cached pro modelo
+   *  (sem mesh rotacionável). PNG público da CDN MakerWorld. */
+  cloudPickUrl?: string | null;
   className?: string;
 }
 
@@ -215,6 +219,7 @@ export function RealisticPreview3D({
   progressPct,
   filamentColor,
   accentColor,
+  cloudPickUrl,
   className,
 }: Props) {
   const [mesh, setMesh] = useState<MeshPayload | null>(null);
@@ -639,22 +644,40 @@ export function RealisticPreview3D({
       ) : null}
 
       {status !== 'ok' ? (
-        <div className="absolute inset-0 grid place-items-center text-muted-foreground bg-gradient-to-b from-[#0a0f1c] to-[#020409]">
-          <div className="flex flex-col items-center gap-2 text-center px-6">
-            {status === 'loading' ? (
-              <Loader2 className="h-8 w-8 animate-spin" />
-            ) : (
-              <Box className="h-8 w-8" strokeWidth={1.2} />
-            )}
-            <span className="text-xs">
-              {status === 'loading'
-                ? 'Carregando modelo 3D…'
-                : status === 'no-model'
-                  ? 'Vincule um .3mf no header pra ver o render realista'
-                  : 'Erro carregando modelo'}
-            </span>
+        status === 'no-model' && cloudPickUrl ? (
+          // Story 4.7: fallback automático com pick_1.png da Bambu Cloud
+          // (vista isométrica). Sem rotação, mas visualmente real do print
+          // atual — sem precisar de upload manual.
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0a0f1c] to-[#020409]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={cloudPickUrl}
+              alt="Preview do modelo atual"
+              className="absolute inset-0 w-full h-full object-contain p-4"
+              loading="lazy"
+            />
+            <div className="absolute bottom-2 left-2 rounded-md bg-background/80 backdrop-blur-sm border border-border/60 px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground pointer-events-none">
+              ISO · cloud
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="absolute inset-0 grid place-items-center text-muted-foreground bg-gradient-to-b from-[#0a0f1c] to-[#020409]">
+            <div className="flex flex-col items-center gap-2 text-center px-6">
+              {status === 'loading' ? (
+                <Loader2 className="h-8 w-8 animate-spin" />
+              ) : (
+                <Box className="h-8 w-8" strokeWidth={1.2} />
+              )}
+              <span className="text-xs">
+                {status === 'loading'
+                  ? 'Carregando modelo 3D…'
+                  : status === 'no-model'
+                    ? 'Vincule um .3mf no header pra ver o render realista'
+                    : 'Erro carregando modelo'}
+              </span>
+            </div>
+          </div>
+        )
       ) : null}
 
       {status === 'ok' && currentLayer != null && totalLayers != null && totalLayers > 0 ? (

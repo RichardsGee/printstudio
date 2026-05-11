@@ -151,6 +151,10 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
               printType: state.printType,
               printErrorCode: state.printErrorCode,
               stateChangeReason: state.stateChangeReason,
+              currentBambuModelId: state.currentBambuModelId ?? null,
+              currentTaskCoverUrl: state.currentTaskCoverUrl ?? null,
+              currentTaskTopUrl: state.currentTaskTopUrl ?? null,
+              currentTaskPickUrl: state.currentTaskPickUrl ?? null,
               updatedAt: new Date(state.updatedAt),
             })
             .onConflictDoUpdate({
@@ -187,6 +191,10 @@ export async function registerBridgeRelay(app: FastifyInstance): Promise<void> {
                 printType: sql`excluded.print_type`,
                 printErrorCode: sql`excluded.print_error_code`,
                 stateChangeReason: sql`excluded.state_change_reason`,
+                currentBambuModelId: sql`excluded.current_bambu_model_id`,
+                currentTaskCoverUrl: sql`excluded.current_task_cover_url`,
+                currentTaskTopUrl: sql`excluded.current_task_top_url`,
+                currentTaskPickUrl: sql`excluded.current_task_pick_url`,
                 updatedAt: sql`excluded.updated_at`,
               },
             })

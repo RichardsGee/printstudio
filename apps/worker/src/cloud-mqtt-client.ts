@@ -10,6 +10,7 @@ import {
 } from '@printstudio/bambu-protocol';
 import type { PrinterState } from '@printstudio/shared';
 import type { Logger } from './logger.js';
+import type { TaskResolver } from './task-resolver.js';
 
 const MQTT_HOST = 'us.mqtt.bambulab.com';
 const MQTT_PORT = 8883;
@@ -25,6 +26,8 @@ export interface CloudMqttOpts {
   accessToken: string;
   devices: CloudMqttDevice[];
   logger: Logger;
+  /** Resolvedor de task → URLs de preview (Story 4.7). Opcional. */
+  taskResolver?: TaskResolver;
 }
 
 /**
@@ -39,6 +42,9 @@ export class CloudMqttClient extends EventEmitter {
   private client: MqttClient | null = null;
   private states = new Map<string, PrinterState>();
   private serialToPrinterId = new Map<string, string>();
+  // Marca o último "fingerprint" do print pra disparar refresh do task resolver
+  // só quando muda (subtask_name + stg_cur servem como hint).
+  private lastTaskHint = new Map<string, string>();
 
   constructor(private readonly opts: CloudMqttOpts) {
     super();
@@ -91,8 +97,23 @@ export class CloudMqttClient extends EventEmitter {
 
       const previous = this.states.get(printerId) ?? emptyState(printerId);
       const next = applyReport(previous, report);
-      this.states.set(printerId, next);
 
+      // Story 4.7 — enriquece state com preview Bambu Cloud
+      if (this.opts.taskResolver) {
+        const hint = next.currentFile ?? '';
+        if (hint && this.lastTaskHint.get(printerId) !== hint) {
+          this.lastTaskHint.set(printerId, hint);
+          // fire-and-forget; próxima mensagem MQTT pega cache populado
+          void this.opts.taskResolver.refresh(printerId, serial, hint);
+        }
+        const preview = this.opts.taskResolver.get(printerId);
+        next.currentBambuModelId = preview.bambuModelId;
+        next.currentTaskCoverUrl = preview.coverUrl;
+        next.currentTaskTopUrl = preview.topUrl;
+        next.currentTaskPickUrl = preview.pickUrl;
+      }
+
+      this.states.set(printerId, next);
       this.emit('state', next);
     });
 

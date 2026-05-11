@@ -223,6 +223,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               progressPct={state?.progressPct ?? null}
               filamentColor={activeSlot?.color ?? null}
               accentColor="#22d3ee"
+              cloudPickUrl={state?.currentTaskPickUrl ?? null}
               className="aspect-square"
             />
           ) : (

@@ -270,6 +270,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 totalLayers={state?.totalLayers ?? null}
                 progressPct={state?.progressPct ?? null}
                 filamentColor={activeSlot?.color ?? null}
+                cloudPickUrl={state?.currentTaskPickUrl ?? null}
               />
 
               <div className="min-w-0 space-y-2">

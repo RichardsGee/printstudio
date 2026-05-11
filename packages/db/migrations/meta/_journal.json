@@ -57,6 +57,13 @@
       "when": 1778821000000,
       "tag": "0007_printers_unique_org_serial",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778900000000,
+      "tag": "0008_printer_state_cloud_preview",
+      "breakpoints": true
     }
   ]
 }

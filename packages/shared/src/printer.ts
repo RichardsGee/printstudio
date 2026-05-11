@@ -84,6 +84,13 @@ export const PrinterStateSchema = z.object({
    *  do .3mf via layers metadata. Usado pra persistir em print_jobs
    *  quando o job termina com SUCCESS. */
   filamentWeightG: z.number().nullable().optional(),
+  /** Auto-preview Bambu Cloud (Story 4.7). Populado pelo worker
+   *  quando a impressora está imprimindo um print da cloud — vem do
+   *  endpoint /v1/user-service/my/tasks. */
+  currentBambuModelId: z.string().nullable().optional(),  // ex: "US547dc630b5cec1"
+  currentTaskCoverUrl: z.string().nullable().optional(),  // Metadata/plate_1.png
+  currentTaskTopUrl: z.string().nullable().optional(),    // Metadata/top_1.png
+  currentTaskPickUrl: z.string().nullable().optional(),   // Metadata/pick_1.png — vista isométrica
   updatedAt: z.string().datetime(),
 });
 export type PrinterState = z.infer<typeof PrinterStateSchema>;
