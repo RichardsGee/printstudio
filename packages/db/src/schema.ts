@@ -11,7 +11,17 @@ import {
   boolean,
   pgEnum,
   unique,
+  customType,
 } from 'drizzle-orm/pg-core';
+
+// Tipo bytea pra colunas de bytes brutos (encrypted blobs). Drizzle não
+// tem helper nativo, então definimos via customType. Usa Uint8Array como
+// transporte em JS (Buffer é compatível pq é subclasse).
+const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
+  dataType: () => 'bytea',
+  fromDriver: (val) => new Uint8Array(val),
+  toDriver: (val) => Buffer.from(val),
+});
 import { relations } from 'drizzle-orm';
 
 export const printerStatusEnum = pgEnum('printer_status', [
@@ -200,11 +210,46 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const organizationsRelations = relations(organizations, ({ many }) => ({
+/**
+ * Credenciais Bambu Cloud por organização. Tokens AES-256-GCM encrypted
+ * em repouso (cripto em packages/db/src/crypto.ts, chave BAMBU_CRED_KEY
+ * vinda do env). Apenas o worker/api decripta no momento de uso.
+ *
+ * UNIQUE (organization_id): MVP suporta 1 conta Bambu por org. V2 pode
+ * relaxar pra múltiplas contas com índice composto.
+ */
+export const bambuCredentials = pgTable('bambu_credentials', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull()
+    .unique(),
+  bambuEmail: text('bambu_email').notNull(),
+  bambuUserId: text('bambu_user_id').notNull(),
+  encryptedAccessToken: bytea('encrypted_access_token').notNull(),
+  encryptedRefreshToken: bytea('encrypted_refresh_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }).notNull(),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const organizationsRelations = relations(organizations, ({ many, one }) => ({
   members: many(organizationMembers),
   printers: many(printers),
   jobs: many(printJobs),
   events: many(events),
+  bambuCredentials: one(bambuCredentials, {
+    fields: [organizations.id],
+    references: [bambuCredentials.organizationId],
+  }),
+}));
+
+export const bambuCredentialsRelations = relations(bambuCredentials, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [bambuCredentials.organizationId],
+    references: [organizations.id],
+  }),
 }));
 
 export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({
@@ -281,3 +326,5 @@ export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type OrganizationMember = typeof organizationMembers.$inferSelect;
 export type NewOrganizationMember = typeof organizationMembers.$inferInsert;
+export type BambuCredential = typeof bambuCredentials.$inferSelect;
+export type NewBambuCredential = typeof bambuCredentials.$inferInsert;
