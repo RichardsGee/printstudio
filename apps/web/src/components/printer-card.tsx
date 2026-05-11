@@ -27,8 +27,10 @@ export function PrinterCard({ printerId, name, state }: Props) {
 
   const printing = status === 'PRINTING' || status === 'PAUSED' || status === 'PREPARE';
 
+  const stationId = `STN-${printerId.slice(0, 4).toUpperCase()}`;
+
   return (
-    <Card className="relative overflow-hidden group">
+    <Card data-mc-card className="relative overflow-hidden group">
       <Link
         href={`/printers/${printerId}`}
         className="absolute inset-0 z-10"
@@ -48,10 +50,15 @@ export function PrinterCard({ printerId, name, state }: Props) {
         {/* Status + nome no topo */}
         <div className="absolute inset-x-0 top-0 p-3 flex items-start justify-between">
           <div className="min-w-0">
-            <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-              Bambu Lab A1
+            <div
+              data-mc-id
+              className="text-caption text-primary uppercase tracking-wider"
+            >
+              {`// ${stationId} · A1+AMS`}
             </div>
-            <div className="text-sm font-semibold truncate">{name}</div>
+            <div className="text-body font-semibold truncate uppercase tracking-wider">
+              {name}
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             <StatusBadge status={status} />
@@ -63,11 +70,17 @@ export function PrinterCard({ printerId, name, state }: Props) {
         {printing ? (
           <div className="absolute bottom-3 left-3 right-3">
             <div className="flex items-baseline gap-1.5 mb-1.5">
-              <span className="text-3xl font-semibold tabular-nums leading-none">
+              <span
+                data-mc-num
+                className="text-3xl font-semibold leading-none"
+              >
                 {progress.toFixed(0)}
               </span>
-              <span className="text-sm text-muted-foreground">%</span>
-              <span className="ml-auto text-[11px] text-muted-foreground truncate max-w-[55%]">
+              <span className="text-small text-muted-foreground">%</span>
+              <span
+                data-mc-id
+                className="ml-auto text-caption text-muted-foreground truncate max-w-[55%]"
+              >
                 {state?.currentFile ?? '—'}
               </span>
             </div>
@@ -78,7 +91,10 @@ export function PrinterCard({ printerId, name, state }: Props) {
               />
             </div>
             {state?.stage && state.stage !== 'Imprimindo' ? (
-              <div className="mt-1 text-[11px] text-muted-foreground truncate">
+              <div
+                data-mc-label
+                className="mt-1 text-caption text-muted-foreground truncate uppercase tracking-wider"
+              >
                 {state.stage}
               </div>
             ) : null}
@@ -86,8 +102,11 @@ export function PrinterCard({ printerId, name, state }: Props) {
         ) : (
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-1.5">
             <FilamentSwatch color={activeSlot?.color ?? null} active={!!activeSlot} size="sm" />
-            <span className="text-xs text-muted-foreground truncate">
-              {state?.stage ?? (activeSlot?.filamentType ?? 'ociosa')}
+            <span
+              data-mc-label
+              className="text-caption text-muted-foreground truncate uppercase tracking-wider"
+            >
+              {state?.stage ?? (activeSlot?.filamentType ?? 'OCIOSA')}
             </span>
           </div>
         )}
@@ -95,31 +114,31 @@ export function PrinterCard({ printerId, name, state }: Props) {
 
       {/* Stats */}
       <CardContent className="space-y-3 pt-4">
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-caption">
           <InfoRow
             icon={Clock}
-            label="Conclui"
+            label="ETA"
             value={formatEtaClock(state?.remainingSec)}
             subtitle={formatDuration(state?.remainingSec)}
           />
           <InfoRow
             icon={Layers}
-            label="Camada"
+            label="LAYER"
             value={`${state?.currentLayer ?? '—'}/${state?.totalLayers ?? '—'}`}
           />
           <InfoRow
             icon={Thermometer}
-            label="Bico"
+            label="NOZZLE"
             value={formatTemp(state?.nozzleTemp, state?.nozzleTargetTemp)}
           />
           <InfoRow
             icon={Flame}
-            label="Mesa"
+            label="BED"
             value={formatTemp(state?.bedTemp, state?.bedTargetTemp)}
           />
         </div>
 
-        <div className="flex items-center justify-between border-t border-border/60 pt-3">
+        <div className="flex items-center justify-between border-t border-[var(--mc-accent-soft)]/30 pt-3">
           <SpeedModeIndicator mode={state?.speedMode ?? null} percent={state?.speedPercent} />
           <WifiIndicator dbm={state?.wifiSignalDbm ?? null} showDbm={false} />
         </div>
@@ -142,10 +161,19 @@ function InfoRow({
   return (
     <div className="flex items-center gap-2">
       <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      <span className="text-muted-foreground">{label}</span>
-      <span className="ml-auto font-medium tabular-nums truncate">{value}</span>
+      <span
+        data-mc-label
+        className="text-muted-foreground uppercase tracking-wider"
+      >
+        {label}
+      </span>
+      <span data-mc-num className="ml-auto font-medium truncate">
+        {value}
+      </span>
       {subtitle ? (
-        <span className="text-[10px] text-muted-foreground tabular-nums">{subtitle}</span>
+        <span data-mc-num className="text-micro text-muted-foreground">
+          {subtitle}
+        </span>
       ) : null}
     </div>
   );

@@ -1,7 +1,8 @@
 import { desc, eq } from 'drizzle-orm';
 import { createDb, printJobs, printers } from '@printstudio/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { JobStatusBadge } from '@/components/job-status-badge';
 import { formatDateTime, formatDuration } from '@/lib/utils';
 import { requireCurrentOrgId } from '@/lib/current-org';
 
@@ -26,38 +27,34 @@ async function loadJobs(organizationId: string) {
     .limit(100);
 }
 
-const STATUS_VARIANT = {
-  RUNNING: 'warning',
-  SUCCESS: 'success',
-  FAILED: 'destructive',
-  CANCELLED: 'outline',
-} as const;
-
 export default async function HistoryPage() {
   const orgId = await requireCurrentOrgId();
   const jobs = await loadJobs(orgId);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Histórico</h1>
-        <p className="text-sm text-muted-foreground">Impressões registradas</p>
-      </div>
+      <PageHeader
+        id="PRINT-LOG"
+        title="Histórico"
+        description="Impressões registradas"
+      />
 
-      <Card>
+      <Card data-mc-card>
         <CardHeader>
-          <CardTitle className="text-base">{jobs.length} impressões</CardTitle>
+          <CardTitle className="text-body">
+            <span data-mc-num>{jobs.length}</span> impressões
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+            <table className="w-full text-small">
+              <thead className="bg-muted/30 text-caption uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="text-left py-2 px-4">Arquivo</th>
-                  <th className="text-left py-2 px-4">Impressora</th>
-                  <th className="text-left py-2 px-4">Início</th>
-                  <th className="text-left py-2 px-4">Duração</th>
-                  <th className="text-left py-2 px-4">Status</th>
+                  <th className="text-left py-2 px-4" data-mc-label>Arquivo</th>
+                  <th className="text-left py-2 px-4" data-mc-label>Impressora</th>
+                  <th className="text-left py-2 px-4" data-mc-label>Início</th>
+                  <th className="text-left py-2 px-4" data-mc-label>Duração</th>
+                  <th className="text-left py-2 px-4" data-mc-label>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -67,18 +64,14 @@ export default async function HistoryPage() {
                       {j.fileName}
                     </td>
                     <td className="py-2 px-4">{j.printerName ?? '—'}</td>
-                    <td className="py-2 px-4 text-muted-foreground">
+                    <td className="py-2 px-4 text-muted-foreground" data-mc-num>
                       {formatDateTime(j.startedAt)}
                     </td>
-                    <td className="py-2 px-4 font-mono">
+                    <td className="py-2 px-4" data-mc-num>
                       {formatDuration(j.durationSec)}
                     </td>
                     <td className="py-2 px-4">
-                      <Badge
-                        variant={STATUS_VARIANT[j.status] ?? 'secondary'}
-                      >
-                        {j.status}
-                      </Badge>
+                      <JobStatusBadge status={j.status} />
                     </td>
                   </tr>
                 ))}
@@ -86,7 +79,7 @@ export default async function HistoryPage() {
                   <tr>
                     <td
                       colSpan={5}
-                      className="text-center py-10 text-muted-foreground text-sm"
+                      className="text-center py-10 text-muted-foreground text-small"
                     >
                       Nenhuma impressão registrada.
                     </td>

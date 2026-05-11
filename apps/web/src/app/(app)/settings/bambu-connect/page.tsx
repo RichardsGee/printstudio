@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 
 type Step = 'loading' | 'connected' | 'email' | 'code' | 'success';
 
@@ -148,16 +149,14 @@ export default function BambuConnectPage() {
 
   return (
     <div className="container max-w-xl py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Conectar conta Bambu Cloud</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Permite que o PrintStudio receba telemetria das impressoras direto da
-          nuvem da Bambu, sem precisar de um bridge LAN.
-        </p>
-      </div>
+      <PageHeader
+        id="BAMBU"
+        title="Conectar conta Bambu Cloud"
+        description="Permite que o PrintStudio receba telemetria das impressoras direto da nuvem da Bambu, sem precisar de um bridge LAN."
+      />
 
       {step === 'loading' && (
-        <Card>
+        <Card data-mc-card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             Carregando status da conexão…
           </CardContent>
@@ -165,7 +164,7 @@ export default function BambuConnectPage() {
       )}
 
       {step === 'connected' && status?.connected && (
-        <Card>
+        <Card data-mc-card>
           <CardHeader>
             <CardTitle>Conta Bambu conectada ✓</CardTitle>
             <CardDescription>
@@ -176,21 +175,21 @@ export default function BambuConnectPage() {
           <CardContent className="space-y-3">
             <div className="rounded-md border p-3 space-y-1 text-sm">
               <div>
-                <span className="text-muted-foreground">Email Bambu:</span>{' '}
+                <span className="text-muted-foreground" data-mc-label>EMAIL:</span>{' '}
                 <strong>{status.bambuEmail}</strong>
               </div>
               <div>
-                <span className="text-muted-foreground">Bambu user ID:</span>{' '}
-                <code className="font-mono text-xs">{status.bambuUserId}</code>
+                <span className="text-muted-foreground" data-mc-label>USER-ID:</span>{' '}
+                <code className="font-mono text-caption" data-mc-id>{status.bambuUserId}</code>
               </div>
               <div>
-                <span className="text-muted-foreground">Token expira em:</span>{' '}
-                {new Date(status.expiresAt).toLocaleString('pt-BR')}
+                <span className="text-muted-foreground" data-mc-label>TOKEN-EXP:</span>{' '}
+                <span data-mc-num>{new Date(status.expiresAt).toLocaleString('pt-BR')}</span>
               </div>
               {status.lastSyncedAt && (
                 <div>
-                  <span className="text-muted-foreground">Sincronizado em:</span>{' '}
-                  {new Date(status.lastSyncedAt).toLocaleString('pt-BR')}
+                  <span className="text-muted-foreground" data-mc-label>SYNC-AT:</span>{' '}
+                  <span data-mc-num>{new Date(status.lastSyncedAt).toLocaleString('pt-BR')}</span>
                 </div>
               )}
             </div>
@@ -217,7 +216,7 @@ export default function BambuConnectPage() {
       )}
 
       {step === 'email' && (
-        <Card>
+        <Card data-mc-card>
           <CardHeader>
             <CardTitle>Passo 1 de 2 — Email da conta Bambu</CardTitle>
             <CardDescription>
@@ -249,7 +248,7 @@ export default function BambuConnectPage() {
       )}
 
       {step === 'code' && (
-        <Card>
+        <Card data-mc-card>
           <CardHeader>
             <CardTitle>Passo 2 de 2 — Código de verificação</CardTitle>
             <CardDescription>
@@ -294,7 +293,7 @@ export default function BambuConnectPage() {
       )}
 
       {step === 'success' && (
-        <Card>
+        <Card data-mc-card>
           <CardHeader>
             <CardTitle>Conta conectada ✓</CardTitle>
             <CardDescription>

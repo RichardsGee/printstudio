@@ -8,10 +8,13 @@ import { Chip } from '@/components/ui/chip';
 import { Metric } from '@/components/ui/metric';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { SectionLabel } from '@/components/ui/section-label';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/status-badge';
+import { JobStatusBadge } from '@/components/job-status-badge';
+import { SeverityBadge } from '@/components/severity-badge';
 import { MissionGauge } from '@/components/kiosk/mission-gauge';
 import { SensorPanel } from '@/components/kiosk/sensor-panel';
 import { cn } from '@/lib/utils';
-import '../../(kiosk)/kiosk-theme.css';
 
 /**
  * Catálogo vivo do design system — todos os atoms & molecules com
@@ -21,13 +24,100 @@ import '../../(kiosk)/kiosk-theme.css';
 export default function DesignSystemPage() {
   return (
     <div className="space-y-6 max-w-5xl">
-      <header className="space-y-1">
-        <h1 className="text-heading">PrintStudio Design System</h1>
-        <p className="text-small text-muted-foreground">
-          Atoms + molecules + tokens que compõem a plataforma. Tudo vivo — os exemplos abaixo
-          são instâncias reais dos componentes, não imagens.
-        </p>
-      </header>
+      <PageHeader
+        id="DESIGN"
+        title="PrintStudio Design System"
+        description="Atoms + molecules + tokens que compõem a plataforma. Tudo vivo — os exemplos abaixo são instâncias reais dos componentes, não imagens."
+      />
+
+      {/* PAGE HEADER */}
+      <Card data-mc-card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-body">
+            <code className="text-small">{'<PageHeader>'}</code> — telemetria de página
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <SectionLabel className="mb-2">Default (id + título + timestamp + descrição)</SectionLabel>
+            <PageHeader
+              id="EXAMPLE"
+              title="Título da página"
+              description="Descrição opcional abaixo do título principal"
+            />
+          </div>
+          <div>
+            <SectionLabel className="mb-2">Sem timestamp (showTimestamp=false)</SectionLabel>
+            <PageHeader
+              id="STATIC"
+              title="Sem relógio"
+              description="Útil em páginas onde o tempo não importa"
+              showTimestamp={false}
+            />
+          </div>
+          <div>
+            <SectionLabel className="mb-2">Com actions (substitui timestamp)</SectionLabel>
+            <PageHeader
+              id="ACTIONS"
+              title="Com botão"
+              description="Slot `actions` pra botões primários no canto direito"
+              actions={<Button size="sm" variant="outline">Editar</Button>}
+            />
+          </div>
+          <div>
+            <SectionLabel className="mb-2">Sem id (título limpo)</SectionLabel>
+            <PageHeader
+              title="Sem identificador"
+              description="O `id` prefix é opcional — sem ele, o título fica sozinho na esquerda"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* STATUS BADGES */}
+      <Card data-mc-card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-body">Status badges — tags técnicas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <SectionLabel className="mb-2">
+              <code className="text-small">{'<StatusBadge>'}</code> — PrinterStatus
+            </SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge status="IDLE" />
+              <StatusBadge status="PREPARE" />
+              <StatusBadge status="PRINTING" />
+              <StatusBadge status="PAUSED" />
+              <StatusBadge status="FINISH" />
+              <StatusBadge status="FAILED" />
+              <StatusBadge status="OFFLINE" />
+              <StatusBadge status="UNKNOWN" />
+            </div>
+          </div>
+          <div>
+            <SectionLabel className="mb-2">
+              <code className="text-small">{'<JobStatusBadge>'}</code> — PrintJobStatus (histórico)
+            </SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              <JobStatusBadge status="RUNNING" />
+              <JobStatusBadge status="SUCCESS" />
+              <JobStatusBadge status="FAILED" />
+              <JobStatusBadge status="CANCELLED" />
+            </div>
+          </div>
+          <div>
+            <SectionLabel className="mb-2">
+              <code className="text-small">{'<SeverityBadge>'}</code> — EventSeverity (log)
+            </SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              <SeverityBadge severity="INFO" />
+              <SeverityBadge severity="WARN" />
+              <SeverityBadge severity="ERROR" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* TYPOGRAPHY */}
       <Card>
@@ -431,21 +521,20 @@ export default function DesignSystemPage() {
         </CardHeader>
         <CardContent className="space-y-2 text-small">
           <p>
-            1. Importar o tema:{' '}
-            <code className="text-caption font-mono">{`import '@/app/(kiosk)/kiosk-theme.css';`}</code>
+            1. O tema é aplicado <strong>globalmente</strong> via{' '}
+            <code className="text-caption font-mono">{`<body className="kiosk-mission">`}</code>{' '}
+            em <code className="text-caption font-mono">app/layout.tsx</code> — todas as
+            rotas (app, kiosk, login) já herdam grid + monospace + cores{' '}
+            <code className="text-caption font-mono">--mc-*</code>.
           </p>
           <p>
-            2. Wrapper na rota:{' '}
-            <code className="text-caption font-mono">{`<div className="kiosk-mission">`}</code>
-          </p>
-          <p>
-            3. Em pages que NÃO sejam o kiosk (ex: este design system), usar o modificador{' '}
-            <code className="text-caption font-mono">demo-mode</code> pra desativar pseudo-elementos
-            globais (scanlines fixed):{' '}
+            2. Pra renderizar o tema <strong>dentro de outro contexto</strong> (ex: este
+            showcase) sem duplicar scanlines/vinheta, usar o modificador{' '}
+            <code className="text-caption font-mono">demo-mode</code>:{' '}
             <code className="text-caption font-mono">{`<div className="kiosk-mission demo-mode">`}</code>
           </p>
           <p>
-            4. Marcar elementos com data-attrs:{' '}
+            3. Marcar elementos com data-attrs:{' '}
             <code className="text-caption font-mono">data-mc-card</code> ·{' '}
             <code className="text-caption font-mono">data-mc-banner</code> ·{' '}
             <code className="text-caption font-mono">data-mc-led</code> ·{' '}
