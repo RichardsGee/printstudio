@@ -10,6 +10,7 @@ import {
   bigserial,
   boolean,
   pgEnum,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -33,8 +34,49 @@ export const jobStatusEnum = pgEnum('job_status', [
   'CANCELLED',
 ]);
 
+export const organizationMemberRoleEnum = pgEnum('organization_member_role', [
+  'owner',
+  'admin',
+  'member',
+]);
+
+/**
+ * Organização — unidade de tenancy no PrintStudio. Cada org tem suas
+ * próprias impressoras, jobs, eventos e (futuro) credenciais Bambu cloud.
+ *
+ * UUID determinístico da "Default" criada pela migration 0005:
+ *   00000000-0000-0000-0000-000000000001
+ */
+export const organizations = pgTable('organizations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const organizationMembers = pgTable(
+  'organization_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    role: organizationMemberRoleEnum('role').default('member').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    uqOrgUser: unique('uq_organization_members_org_user').on(t.organizationId, t.userId),
+  }),
+);
+
 export const printers = pgTable('printers', {
   id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull(),
   name: text('name').notNull(),
   serial: text('serial').notNull().unique(),
   accessCode: text('access_code').notNull(),
@@ -84,6 +126,9 @@ export const printerState = pgTable('printer_state', {
 
 export const printJobs = pgTable('print_jobs', {
   id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull(),
   printerId: uuid('printer_id')
     .references(() => printers.id, { onDelete: 'cascade' })
     .notNull(),
@@ -106,6 +151,9 @@ export const printJobs = pgTable('print_jobs', {
  */
 export const temperatureSamples = pgTable('temperature_samples', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull(),
   printerId: uuid('printer_id')
     .references(() => printers.id, { onDelete: 'cascade' })
     .notNull(),
@@ -119,6 +167,9 @@ export const temperatureSamples = pgTable('temperature_samples', {
 
 export const events = pgTable('events', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull(),
   printerId: uuid('printer_id').references(() => printers.id, { onDelete: 'cascade' }),
   type: text('type').notNull(),
   severity: eventSeverityEnum('severity').default('INFO').notNull(),
@@ -149,7 +200,29 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  members: many(organizationMembers),
+  printers: many(printers),
+  jobs: many(printJobs),
+  events: many(events),
+}));
+
+export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organizationMembers.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [organizationMembers.userId],
+    references: [users.id],
+  }),
+}));
+
 export const printersRelations = relations(printers, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [printers.organizationId],
+    references: [organizations.id],
+  }),
   state: one(printerState, {
     fields: [printers.id],
     references: [printerState.printerId],
@@ -181,6 +254,7 @@ export const eventsRelations = relations(events, ({ one }) => ({
 
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
+  memberships: many(organizationMembers),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -203,3 +277,7 @@ export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type TemperatureSample = typeof temperatureSamples.$inferSelect;
 export type NewTemperatureSample = typeof temperatureSamples.$inferInsert;
+export type Organization = typeof organizations.$inferSelect;
+export type NewOrganization = typeof organizations.$inferInsert;
+export type OrganizationMember = typeof organizationMembers.$inferSelect;
+export type NewOrganizationMember = typeof organizationMembers.$inferInsert;
