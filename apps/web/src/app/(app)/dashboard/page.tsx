@@ -1,5 +1,6 @@
-import { desc, eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { createDb, printers } from '@printstudio/db';
+import { PageHeader } from '@/components/ui/page-header';
 import { requireCurrentOrgId } from '@/lib/current-org';
 import { DashboardClient } from './dashboard-client';
 
@@ -11,7 +12,7 @@ async function loadPrinters(organizationId: string) {
     .select({ id: printers.id, name: printers.name })
     .from(printers)
     .where(eq(printers.organizationId, organizationId))
-    .orderBy(desc(printers.createdAt))
+    .orderBy(sql`${printers.displayOrder} ASC NULLS LAST`, asc(printers.createdAt))
     .limit(10);
   return rows;
 }
@@ -21,12 +22,11 @@ export default async function DashboardPage() {
   const list = await loadPrinters(orgId);
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Estado em tempo real das impressoras
-        </p>
-      </div>
+      <PageHeader
+        id="DASHBOARD"
+        title="Dashboard"
+        description="Estado em tempo real das impressoras"
+      />
       <DashboardClient printers={list} />
     </div>
   );

@@ -100,6 +100,9 @@ export const printers = pgTable(
     accessCode: text('access_code').notNull(),
     ipAddress: inet('ip_address'),
     model: text('model').default('A1').notNull(),
+    // Ordem manual de exibição no /kiosk e /dashboard. Lower = primeiro.
+    // Quando NULL, ordena por createdAt como fallback.
+    displayOrder: integer('display_order'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
