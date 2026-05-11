@@ -17,6 +17,10 @@ interface Props {
   /** Story 4.7: vista isométrica (pick_1.png) da Bambu Cloud — fallback
    *  no modo "Real" quando não há .3mf cached. */
   cloudPickUrl?: string | null;
+  /** Story 4.8: bambu_model_id da impressão atual. Quando presente,
+   *  RealisticPreview3D busca mesh em /api/cached-models antes do
+   *  bridge LAN. */
+  cloudBambuModelId?: string | null;
   className?: string;
 }
 
@@ -37,6 +41,7 @@ export function PrintPreview({
   progressPct,
   filamentColor,
   cloudPickUrl,
+  cloudBambuModelId,
   className,
 }: Props) {
   const [mode, setMode] = useState<Mode>('thumbnail');
@@ -82,6 +87,7 @@ export function PrintPreview({
           progressPct={progressPct}
           filamentColor={filamentColor}
           cloudPickUrl={cloudPickUrl}
+          cloudBambuModelId={cloudBambuModelId}
           className="aspect-square"
         />
       )}

@@ -42,6 +42,7 @@ import { PowerUsage } from '@/components/power-usage';
 import { FilamentUsage } from '@/components/filament-usage';
 import { FilamentTotal } from '@/components/filament-total';
 import { ModelLink } from '@/components/model-link';
+import { UploadCachedModel } from '@/components/upload-cached-model';
 import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils';
 
 interface Props {
@@ -257,8 +258,19 @@ export function PrinterDetailClient({ printerId, name }: Props) {
         </Card>
 
         <Card className="lg:col-span-5">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm">Impressão atual</CardTitle>
+            {state?.currentBambuModelId ? (
+              <UploadCachedModel
+                key={state.currentBambuModelId}
+                bambuModelId={state.currentBambuModelId}
+                onUploaded={() => {
+                  // Hard reload pra forçar RealisticPreview3D buscar o
+                  // mesh recém-uploadado (key prop também muda).
+                  window.location.reload();
+                }}
+              />
+            ) : null}
           </CardHeader>
           <CardContent className="pb-3 space-y-3">
             {/* Linha superior: preview + arquivo + filamento */}
@@ -271,6 +283,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 progressPct={state?.progressPct ?? null}
                 filamentColor={activeSlot?.color ?? null}
                 cloudPickUrl={state?.currentTaskPickUrl ?? null}
+                cloudBambuModelId={state?.currentBambuModelId ?? null}
               />
 
               <div className="min-w-0 space-y-2">

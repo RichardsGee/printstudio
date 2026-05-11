@@ -49,6 +49,10 @@ interface Props {
    *  do print atual. Mostrada quando NÃO há .3mf cached pro modelo
    *  (sem mesh rotacionável). PNG público da CDN MakerWorld. */
   cloudPickUrl?: string | null;
+  /** Bambu model ID da impressão atual (Story 4.8). Se presente,
+   *  tenta buscar mesh cached via /api/cached-models/by-model/{id}
+   *  ANTES de cair pro bridge LAN. */
+  cloudBambuModelId?: string | null;
   className?: string;
 }
 
@@ -220,6 +224,7 @@ export function RealisticPreview3D({
   filamentColor,
   accentColor,
   cloudPickUrl,
+  cloudBambuModelId,
   className,
 }: Props) {
   const [mesh, setMesh] = useState<MeshPayload | null>(null);
@@ -237,9 +242,28 @@ export function RealisticPreview3D({
     setStatus('loading');
     setMesh(null);
 
-    const url = `${getBridgeBase()}/api/printers/${printerId}/uploaded-model.json`;
-    fetch(url)
-      .then(async (r) => {
+    const tryCloud = cloudBambuModelId
+      ? fetch(`/api/cached-models/by-model/${encodeURIComponent(cloudBambuModelId)}`, {
+          credentials: 'include',
+        }).then(async (r) => {
+          if (r.status === 404) return null;
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data = (await r.json()) as { meshPayload: MeshPayload };
+          return data.meshPayload;
+        })
+      : Promise.resolve(null);
+
+    tryCloud
+      .then(async (cloudMesh) => {
+        if (!alive) return;
+        if (cloudMesh && cloudMesh.vertices?.length && cloudMesh.indices?.length) {
+          setMesh(cloudMesh);
+          setStatus('ok');
+          return;
+        }
+        // Fallback pro bridge LAN (modo legado)
+        const url = `${getBridgeBase()}/api/printers/${printerId}/uploaded-model.json`;
+        const r = await fetch(url);
         if (r.status === 404) throw new Error('no-model');
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data: MeshPayload = await r.json();
@@ -258,7 +282,7 @@ export function RealisticPreview3D({
     return () => {
       alive = false;
     };
-  }, [printerId]);
+  }, [printerId, cloudBambuModelId]);
 
   // Setup da cena (única por mesh).
   useEffect(() => {

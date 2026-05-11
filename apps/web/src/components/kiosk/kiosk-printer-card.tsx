@@ -228,6 +228,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
               filamentColor={activeSlot?.color ?? null}
               accentColor="#22d3ee"
               cloudPickUrl={state?.currentTaskPickUrl ?? null}
+              cloudBambuModelId={state?.currentBambuModelId ?? null}
               className="aspect-square"
             />
           ) : (

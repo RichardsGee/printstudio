@@ -239,6 +239,39 @@ export const sessions = pgTable('sessions', {
  * UNIQUE (organization_id): MVP suporta 1 conta Bambu por org. V2 pode
  * relaxar pra múltiplas contas com índice composto.
  */
+/**
+ * Mesh 3D pré-parseado de um .3mf, vinculado ao bambu_model_id por org.
+ * Story 4.8: user uploada o .3mf 1 vez por modelo; futuras impressões
+ * do mesmo bambu_model_id reusam automaticamente o mesh cached.
+ *
+ * O parse acontece no client (Three.js ThreeMFLoader) — server só
+ * armazena o resultado JSON (vertices/indices). Isso evita dependência
+ * de Node parser pra .3mf e mantém o servidor stateless.
+ *
+ * UNIQUE (org, bambu_model_id) — 1 cache por modelo por org no MVP.
+ * Multi-plate é tratado uniformemente: o mesh contém todos os objetos
+ * do .3mf combinados (ignora plate_index na renderização).
+ */
+export const cachedModels = pgTable(
+  'cached_models',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    bambuModelId: text('bambu_model_id').notNull(),
+    filename: text('filename').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    // { vertices: number[], indices: number[] } — pré-parsed
+    meshPayload: jsonb('mesh_payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    uqOrgModel: unique('cached_models_org_model_unique').on(t.organizationId, t.bambuModelId),
+  }),
+);
+
 export const bambuCredentials = pgTable('bambu_credentials', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id')
@@ -349,3 +382,5 @@ export type OrganizationMember = typeof organizationMembers.$inferSelect;
 export type NewOrganizationMember = typeof organizationMembers.$inferInsert;
 export type BambuCredential = typeof bambuCredentials.$inferSelect;
 export type NewBambuCredential = typeof bambuCredentials.$inferInsert;
+export type CachedModel = typeof cachedModels.$inferSelect;
+export type NewCachedModel = typeof cachedModels.$inferInsert;
