@@ -279,6 +279,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             {/* Linha superior: preview + arquivo + filamento */}
             <div className="grid grid-cols-[10rem_1fr] gap-3 items-center">
               <PrintPreview
+                key={`pp-${cachedVersion}`}
                 printerId={printerId}
                 cacheKey={state?.currentFile ?? null}
                 currentLayer={state?.currentLayer ?? null}
