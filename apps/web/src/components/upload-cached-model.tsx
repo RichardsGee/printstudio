@@ -1,10 +1,10 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import * as THREE from 'three';
 import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
 import { unzipSync, strFromU8 } from 'fflate';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import type { CachedModelUploadRequest } from '@printstudio/shared';
@@ -14,6 +14,14 @@ interface Props {
   /** Callback após upload bem-sucedido. */
   onUploaded?: () => void;
   className?: string;
+}
+
+interface CachedPlate {
+  id: string;
+  plateIndex: number;
+  filename: string;
+  sizeBytes: number;
+  updatedAt: string;
 }
 
 interface PlateMesh {
@@ -37,9 +45,54 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [progress, setProgress] = useState<string | null>(null);
+  const [cached, setCached] = useState<CachedPlate[] | null>(null);
+
+  // Checa se já existe cached pra esse modelo (decide entre "Vincular"
+  // vs "Substituir + Remover" no UI).
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/cached-models/by-model/${encodeURIComponent(bambuModelId)}/list`, {
+      credentials: 'include',
+    })
+      .then((r) => (r.ok ? r.json() : { plates: [] }))
+      .then((data: { plates: CachedPlate[] }) => {
+        if (alive) setCached(data.plates ?? []);
+      })
+      .catch(() => {
+        if (alive) setCached([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [bambuModelId]);
 
   function handleClick() {
     inputRef.current?.click();
+  }
+
+  function handleRemove() {
+    if (!cached || cached.length === 0) return;
+    const plural = cached.length > 1 ? `${cached.length} plates` : '1 plate';
+    if (!confirm(`Remover .3mf vinculado (${plural})? Próximas impressões deste modelo voltam a mostrar a vista ISO da Bambu Cloud.`)) {
+      return;
+    }
+    start(async () => {
+      try {
+        setProgress('Removendo…');
+        const res = await fetch(
+          `/api/cached-models/by-model/${encodeURIComponent(bambuModelId)}/delete`,
+          { method: 'DELETE', credentials: 'include' },
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        toast.success('.3mf desvinculado');
+        setCached([]);
+        onUploaded?.();
+      } catch (err) {
+        toast.error((err as Error).message || 'Falha ao remover');
+      } finally {
+        setProgress(null);
+      }
+    });
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -100,8 +153,10 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
     });
   }
 
+  const hasCached = cached !== null && cached.length > 0;
+
   return (
-    <>
+    <div className={`flex items-center gap-2 ${className ?? ''}`}>
       <input
         ref={inputRef}
         type="file"
@@ -116,16 +171,29 @@ export function UploadCachedModel({ bambuModelId, onUploaded, className }: Props
         variant="outline"
         onClick={handleClick}
         disabled={pending}
-        className={className}
       >
         {pending ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
           <Upload className="h-3.5 w-3.5" />
         )}
-        <span className="ml-2 text-xs">{progress ?? 'Vincular .3mf'}</span>
+        <span className="ml-2 text-xs">
+          {progress ?? (hasCached ? 'Substituir .3mf' : 'Vincular .3mf')}
+        </span>
       </Button>
-    </>
+      {hasCached ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={handleRemove}
+          disabled={pending}
+          title={`${cached!.length} plate(s) vinculado(s)`}
+        >
+          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
