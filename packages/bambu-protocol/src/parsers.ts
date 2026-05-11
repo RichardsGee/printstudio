@@ -78,6 +78,30 @@ export function parseAmsSlots(ams?: BambuAms): AmsSlot[] {
   return slots;
 }
 
+/**
+ * Faz merge slot-a-slot do AMS: combina slots previamente conhecidos
+ * com os novos (parciais). A Bambu manda updates parciais — ex: só o
+ * slot cuja cor mudou — então um simples replace perderia os outros.
+ *
+ * Também recalcula `active` em TODOS os slots baseado em activeSlotIndex
+ * (pq o `incoming` só carrega `active=true` no slot que veio).
+ */
+export function mergeAmsSlots(
+  previous: AmsSlot[],
+  incoming: AmsSlot[],
+  activeSlotIndex: number | null,
+): AmsSlot[] {
+  const map = new Map<number, AmsSlot>();
+  for (const s of previous) map.set(s.slot, { ...s });
+  for (const s of incoming) {
+    const old = map.get(s.slot);
+    map.set(s.slot, { ...(old ?? {}), ...s });
+  }
+  return Array.from(map.values())
+    .map((s) => ({ ...s, active: activeSlotIndex !== null && s.slot === activeSlotIndex }))
+    .sort((a, b) => a.slot - b.slot);
+}
+
 export function parseActiveSlot(ams?: BambuAms): number | null {
   if (!ams) return null;
   // `tray_tar` is the tray the printer is actively feeding from during a
@@ -258,6 +282,10 @@ export function applyReport(
     status === 'FINISH' || status === 'IDLE' || status === 'FAILED' || status === 'OFFLINE'
       ? null
       : rawStage;
+  const nextActiveSlot =
+    print.ams?.tray_now !== undefined || print.ams?.tray_tar !== undefined
+      ? parseActiveSlot(print.ams) ?? previous.activeSlotIndex
+      : previous.activeSlotIndex;
   return {
     ...previous,
     status,
@@ -277,17 +305,21 @@ export function applyReport(
     hmsErrors: print.hms
       ? print.hms.map(parseHmsError).filter((e): e is HmsError => e !== null)
       : previous.hmsErrors,
-    // Bambu often sends partial AMS updates (just `tray_now` without the full
-    // `ams.ams[]` array). Only replace the cached slots when the report
-    // actually carries a non-empty tray list — otherwise keep what we have.
+    // Bambu manda updates AMS de duas formas:
+    //  (a) Lista completa `ams.ams[]` com todos os trays (boot, pushall)
+    //  (b) Update parcial (ex: NFC leu novo tray) — só o tray que mudou
+    // Em (b), replace cego apaga os outros slots. mergeAmsSlots faz merge
+    // por slot id mantendo o que veio antes.
+    activeSlotIndex: nextActiveSlot,
     amsSlots:
-      print.ams?.ams && print.ams.ams.length > 0 ? parseAmsSlots(print.ams) : previous.amsSlots,
+      print.ams?.ams && print.ams.ams.length > 0
+        ? mergeAmsSlots(previous.amsSlots, parseAmsSlots(print.ams), nextActiveSlot)
+        : previous.amsSlots.map((s) => ({
+            ...s,
+            active: nextActiveSlot !== null && s.slot === nextActiveSlot,
+          })),
     amsUnits:
       print.ams?.ams && print.ams.ams.length > 0 ? parseAmsUnits(print.ams) : previous.amsUnits,
-    activeSlotIndex:
-      print.ams?.tray_now !== undefined || print.ams?.tray_tar !== undefined
-        ? parseActiveSlot(print.ams) ?? previous.activeSlotIndex
-        : previous.activeSlotIndex,
     speedMode: print.spd_lvl !== undefined ? mapSpeedMode(print.spd_lvl) : previous.speedMode,
     speedPercent: print.spd_mag ?? previous.speedPercent,
     wifiSignalDbm: print.wifi_signal !== undefined ? parseWifiDbm(print.wifi_signal) : previous.wifiSignalDbm,
