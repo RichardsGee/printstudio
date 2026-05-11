@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import * as THREE from 'three';
 import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
-import { unzipSync, strFromU8 } from 'fflate';
 import { Upload, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -29,11 +28,7 @@ interface CachedPlate {
   updatedAt: string;
 }
 
-interface PlateMesh {
-  plateIndex: number;
-  vertices: number[];
-  indices: number[];
-}
+
 
 /**
  * Botão "Vincular .3mf" (Story 4.8/4.9).
@@ -234,124 +229,6 @@ async function parseCombinedMesh(
   const combined = combineMeshes(all);
   if (!combined) throw new Error('Falha ao combinar meshes');
   return combined;
-}
-
-async function parsePlates(buffer: ArrayBuffer): Promise<PlateMesh[]> {
-  const uint8 = new Uint8Array(buffer);
-  const files = unzipSync(uint8);
-
-  // Carrega tudo com ThreeMFLoader pra ter geometrias com transform aplicado
-  const loader = new ThreeMFLoader();
-  const group = loader.parse(buffer);
-
-  // Coleta TODOS os meshes do Group, indexados de várias formas pra
-  // maximizar chance de match com object_id do model_settings.config.
-  // ThreeMFLoader (Three r184) é inconsistente sobre onde guarda o id
-  // do object original — às vezes em mesh.name, às vezes em userData.
-  const allMeshes: THREE.Mesh[] = [];
-  const meshById = new Map<string, THREE.Mesh[]>();
-  function indexBy(key: string | undefined | null, mesh: THREE.Mesh) {
-    if (!key) return;
-    const k = String(key);
-    const list = meshById.get(k) ?? [];
-    list.push(mesh);
-    meshById.set(k, list);
-  }
-  group.traverse((obj: THREE.Object3D) => {
-    if (!(obj instanceof THREE.Mesh)) return;
-    if (!obj.geometry || !obj.geometry.getAttribute('position')) return;
-    allMeshes.push(obj);
-    indexBy(obj.name, obj);
-    const ud = obj.userData ?? {};
-    indexBy(ud.objectId as string, obj);
-    indexBy(ud.id as string, obj);
-    indexBy(ud.componentId as string, obj);
-  });
-
-  if (allMeshes.length === 0) {
-    throw new Error(
-      'ThreeMFLoader não retornou meshes — arquivo .3mf pode estar corrompido ou em formato não suportado',
-    );
-  }
-
-  // Tenta ler model_settings.config (Bambu proprietary) pra detectar plates
-  const settingsRaw = files['Metadata/model_settings.config'];
-  const platesMap = settingsRaw
-    ? parsePlatesFromSettings(strFromU8(settingsRaw))
-    : null;
-
-  // Fallback 1: sem mapping de plates ou mapping vazio → tudo vira plate 1
-  if (!platesMap || platesMap.size === 0) {
-    const combined = combineMeshes(allMeshes);
-    if (!combined) throw new Error('Falha ao combinar meshes (geometria vazia)');
-    return [{ plateIndex: 1, ...combined }];
-  }
-
-  // Tenta gerar 1 mesh por plate usando object_ids do settings
-  const result: PlateMesh[] = [];
-  let matchedAny = false;
-  for (const [plateIndex, objectIds] of platesMap.entries()) {
-    const seen = new Set<THREE.Mesh>();
-    for (const oid of objectIds) {
-      const list = meshById.get(oid);
-      if (list) {
-        matchedAny = true;
-        list.forEach((m) => seen.add(m));
-      }
-    }
-    if (seen.size > 0) {
-      const combined = combineMeshes(Array.from(seen));
-      if (combined) result.push({ plateIndex, ...combined });
-    }
-  }
-
-  // Fallback 2: mapping existe mas nenhum object_id casa com mesh
-  // (id desencontrado pelo loader) → tudo vira plate 1
-  if (!matchedAny || result.length === 0) {
-    const combined = combineMeshes(allMeshes);
-    if (!combined) throw new Error('Falha ao combinar meshes');
-    return [{ plateIndex: 1, ...combined }];
-  }
-
-  return result.sort((a, b) => a.plateIndex - b.plateIndex);
-}
-
-/**
- * Parsea Bambu model_settings.config (XML) pra extrair plate_id → [object_ids].
- *
- * Estrutura típica:
- *   <plate>
- *     <metadata key="plate_id" value="1"/>
- *     <model_instance>
- *       <metadata key="object_id" value="2"/>
- *     </model_instance>
- *   </plate>
- */
-function parsePlatesFromSettings(xml: string): Map<number, string[]> {
-  const result = new Map<number, string[]>();
-  if (typeof window === 'undefined' || !window.DOMParser) return result;
-
-  const doc = new DOMParser().parseFromString(xml, 'application/xml');
-  const plates = doc.querySelectorAll('plate');
-  plates.forEach((plate) => {
-    let plateId: number | null = null;
-    plate.querySelectorAll(':scope > metadata').forEach((m) => {
-      if (m.getAttribute('key') === 'plate_id') {
-        const v = parseInt(m.getAttribute('value') ?? '', 10);
-        if (Number.isFinite(v)) plateId = v;
-      }
-    });
-    if (plateId === null) return;
-    const objectIds: string[] = [];
-    plate.querySelectorAll('model_instance > metadata').forEach((m) => {
-      if (m.getAttribute('key') === 'object_id') {
-        const v = m.getAttribute('value');
-        if (v) objectIds.push(v);
-      }
-    });
-    if (objectIds.length > 0) result.set(plateId, objectIds);
-  });
-  return result;
 }
 
 function combineMeshes(meshes: THREE.Mesh[]): { vertices: number[]; indices: number[] } | null {
