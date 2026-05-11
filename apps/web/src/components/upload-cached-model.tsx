@@ -312,15 +312,24 @@ function parsePlateFromBambu3mf(
   const modelDoc = parser.parseFromString(strFromU8(modelRaw), 'application/xml');
   const settingsDoc = parser.parseFromString(strFromU8(settingsRaw), 'application/xml');
 
-  // 1. objects (mesh data por id). Bambu Studio usa formato split:
-  // 3D/3dmodel.model só lista components apontando pra arquivos externos
-  // em 3D/Objects/object_N.model (cada um com o mesh inline). Lemos
-  // PRIMEIRO os arquivos externos, DEPOIS o 3dmodel.model como fallback
-  // pra objects com mesh inline.
-  type ObjectMesh = { vertices: Float32Array; indices: number[] };
-  const objects = new Map<string, ObjectMesh>();
+  // 1. objects (definição completa: mesh inline + components). Bambu split-mesh:
+  // - <object id="X"> em 3dmodel.model pode ser wrapper com <components>
+  //   apontando pra arquivos externos (objectid -> 3D/Objects/object_N.model)
+  // - <object> em arquivos externos tem mesh inline
+  // Pra resolver um objeto, descemos recursivamente pelos components aplicando
+  // composição de transforms (cada component tem seu próprio transform).
+  type ObjectDef = {
+    mesh: { vertices: Float32Array; indices: number[] } | null;
+    components: { objectId: string; matrix: number[] }[];
+  };
+  const objects = new Map<string, ObjectDef>();
 
-  function extractMeshFromObjectElement(obj: Element): ObjectMesh | null {
+  const parseTransform = (s: string | null): number[] => {
+    const arr = (s ?? '1 0 0 0 1 0 0 0 1 0 0 0').trim().split(/\s+/).map(Number);
+    return arr.length === 12 ? arr : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+  };
+
+  const extractObjectDef = (obj: Element): ObjectDef => {
     const verts: number[] = [];
     obj.querySelectorAll('mesh > vertices > vertex').forEach((v) => {
       verts.push(
@@ -337,43 +346,67 @@ function parsePlateFromBambu3mf(
         Number(t.getAttribute('v3') ?? 0),
       );
     });
-    if (verts.length === 0 || tris.length === 0) return null;
-    return { vertices: new Float32Array(verts), indices: tris };
-  }
+    const mesh =
+      verts.length > 0 && tris.length > 0
+        ? { vertices: new Float32Array(verts), indices: tris }
+        : null;
+    const components: { objectId: string; matrix: number[] }[] = [];
+    obj.querySelectorAll('components > component').forEach((c) => {
+      const objectId = c.getAttribute('objectid');
+      if (!objectId) return;
+      components.push({
+        objectId,
+        matrix: parseTransform(c.getAttribute('transform')),
+      });
+    });
+    return { mesh, components };
+  };
 
-  // 1a. Lê arquivos externos 3D/Objects/object_*.model (formato Bambu split)
+  // 1a. Lê arquivos externos 3D/Objects/object_*.model (formato Bambu split-mesh).
+  // Indexa pelo número do path E pelo internal <object id> como fallback.
   let splitFileCount = 0;
   for (const path of Object.keys(files)) {
-    if (!path.startsWith('3D/Objects/') || !path.endsWith('.model')) continue;
+    const match = /^3D\/Objects\/object_(\d+)\.model$/.exec(path);
+    if (!match) continue;
     splitFileCount++;
+    const fileObjectId = match[1]!;
     try {
       const objDoc = parser.parseFromString(strFromU8(files[path]!), 'application/xml');
       objDoc.querySelectorAll('object').forEach((obj) => {
-        const id = obj.getAttribute('id');
-        if (!id) return;
-        const mesh = extractMeshFromObjectElement(obj);
-        if (mesh) objects.set(id, mesh);
+        const internalId = obj.getAttribute('id');
+        const def = extractObjectDef(obj);
+        if (!def.mesh && def.components.length === 0) return;
+        objects.set(fileObjectId, def);
+        if (internalId && internalId !== fileObjectId) objects.set(internalId, def);
       });
     } catch (err) {
       console.warn(`[3mf] falha parsing ${path}:`, err);
     }
   }
-  console.log(`[3mf] objects de arquivos externos: ${splitFileCount} files → ${objects.size} objects`);
 
-  // 1b. Fallback: lê objects inline do 3dmodel.model (formato monolítico)
+  // 1b. Lê 3D/3dmodel.model — geralmente tem wrappers <object> com <components>
+  // apontando pros arquivos externos. NÃO usa `objects.has(id)` como guard porque
+  // queremos sobrescrever objetos com versão que inclui components.
   let inlineCount = 0;
   modelDoc.querySelectorAll('object').forEach((obj) => {
     const id = obj.getAttribute('id');
-    if (!id || objects.has(id)) return;
-    const mesh = extractMeshFromObjectElement(obj);
-    if (mesh) {
-      objects.set(id, mesh);
-      inlineCount++;
-    }
+    if (!id) return;
+    const def = extractObjectDef(obj);
+    if (!def.mesh && def.components.length === 0) return;
+    objects.set(id, def);
+    inlineCount++;
   });
-  if (inlineCount > 0) {
-    console.log(`[3mf] +${inlineCount} objects inline do 3dmodel.model`);
+
+  let withMesh = 0,
+    withComp = 0;
+  for (const def of objects.values()) {
+    if (def.mesh) withMesh++;
+    if (def.components.length) withComp++;
   }
+  console.log(
+    `[3mf] objects: ${splitFileCount} external files + ${inlineCount} inline → ${objects.size} entries (${withMesh} c/ mesh, ${withComp} c/ components)`,
+  );
+  console.log(`[3mf] objects keys (até 30):`, Array.from(objects.keys()).slice(0, 30));
 
   // 2. Build items na ordem (instance_id = índice GLOBAL).
   type BuildItem = { objectId: string; matrix: number[] };
@@ -397,49 +430,46 @@ function parsePlateFromBambu3mf(
 
   if (objects.size === 0 || buildItems.length === 0) return null;
 
-  // 3. Acha o plate desejado em model_settings.config
-  // NÃO usa `:scope > metadata` — não funciona consistente em XML
-  // parseado por DOMParser. Itera children direto via Element API.
-  const directChildren = (el: Element, tag: string): Element[] => {
-    const out: Element[] = [];
-    for (let i = 0; i < el.children.length; i++) {
-      const c = el.children[i]!;
-      if (c.tagName === tag || c.tagName.toLowerCase() === tag.toLowerCase()) {
-        out.push(c);
-      }
-    }
-    return out;
-  };
+  // 3. Acha o <plate> com plater_id == plateIndex.
+  // Bambu usa key="plater_id" (NÃO plate_id) como filho direto de <plate>.
+  // Cada <plate> agrupa <model_instance> filhos com object_id/instance_id.
+  const allPlates = Array.from(settingsDoc.querySelectorAll('plate'));
+  console.log(`[3mf] total <plate> em settings: ${allPlates.length}, buscando id=${plateIndex}`);
 
-  const allPlates = settingsDoc.querySelectorAll('plate');
-  console.log(`[3mf] total plates em settings: ${allPlates.length}, buscando plate_id=${plateIndex}`);
-  const platesFound: number[] = [];
+  const plateIds: number[] = [];
   let targetPlate: Element | null = null;
-  allPlates.forEach((p) => {
-    for (const m of directChildren(p, 'metadata')) {
-      if (m.getAttribute('key') === 'plate_id') {
-        const v = Number(m.getAttribute('value'));
-        platesFound.push(v);
-        if (v === plateIndex && !targetPlate) targetPlate = p;
+  for (const p of allPlates) {
+    let pid = -1;
+    for (const child of Array.from(p.children)) {
+      if (child.tagName.toLowerCase() !== 'metadata') continue;
+      const k = child.getAttribute('key');
+      if (k === 'plater_id' || k === 'plate_id' || k === 'plate_index' || k === 'plater_index') {
+        pid = Number(child.getAttribute('value'));
       }
     }
-  });
-  console.log(`[3mf] plate_ids encontrados no settings:`, platesFound);
+    if (pid >= 0) plateIds.push(pid);
+    if (pid === plateIndex && !targetPlate) targetPlate = p;
+  }
+  console.log(`[3mf] plate ids encontrados:`, plateIds);
+
   if (!targetPlate) {
-    console.warn(`[3mf] plate ${plateIndex} NÃO encontrado no settings`);
+    console.warn(`[3mf] plate ${plateIndex} NÃO encontrado. disponíveis:`, plateIds);
     return null;
   }
 
-  // 4. Lê os model_instances do plate (direct children of plate)
+  // 4. Lê <model_instance> filhos diretos do targetPlate, e dentro de cada
+  // um lê os metadados object_id e instance_id.
   interface InstanceRef {
     objectId: string;
     instanceId: number;
   }
   const refs: InstanceRef[] = [];
-  for (const mi of directChildren(targetPlate as Element, 'model_instance')) {
+  for (const child of Array.from(targetPlate.children)) {
+    if (child.tagName.toLowerCase() !== 'model_instance') continue;
     let objId = '';
     let instId = -1;
-    for (const m of directChildren(mi, 'metadata')) {
+    for (const m of Array.from(child.children)) {
+      if (m.tagName.toLowerCase() !== 'metadata') continue;
       const k = m.getAttribute('key');
       const v = m.getAttribute('value') ?? '';
       if (k === 'object_id') objId = v;
@@ -448,18 +478,15 @@ function parsePlateFromBambu3mf(
     if (objId && instId >= 0) refs.push({ objectId: objId, instanceId: instId });
   }
   console.log(`[3mf] model_instances do plate ${plateIndex}: ${refs.length} refs`, refs);
-  console.log(
-    `[3mf] XML do plate ${plateIndex} (primeiros 2KB):\n`,
-    new XMLSerializer().serializeToString(targetPlate as Element).slice(0, 2000),
-  );
+
   if (refs.length === 0) {
     console.warn(`[3mf] plate ${plateIndex} sem model_instances`);
     return null;
   }
 
-  // 5. Pra cada ref, encontra build item correto e aplica transform.
-  // Tenta interpretar instance_id de 2 formas — primeiro como índice
-  // global no build, depois como índice por objectId (Bambu varia).
+  // 5. Resolve mesh por objeto, expandindo recursivamente os <components>
+  // do Bambu split-mesh. Compõe transforms (inner.matrix × outer.matrix) ao
+  // descer cada nível.
   const itemsByObjectId = new Map<string, BuildItem[]>();
   for (const b of buildItems) {
     const arr = itemsByObjectId.get(b.objectId) ?? [];
@@ -467,51 +494,101 @@ function parsePlateFromBambu3mf(
     itemsByObjectId.set(b.objectId, arr);
   }
 
+  // Composição de transforms 3MF (afim 4x3 row-major).
+  // p' = p * inner_R + inner_T (no objeto interno), então no parent:
+  //   p'' = p' * outer_R + outer_T
+  //       = p * (inner_R * outer_R) + (inner_T * outer_R + outer_T)
+  const composeTransform = (inner: number[], outer: number[]): number[] => {
+    const r = new Array(12);
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        r[i * 3 + j] =
+          inner[i * 3]! * outer[j]! +
+          inner[i * 3 + 1]! * outer[3 + j]! +
+          inner[i * 3 + 2]! * outer[6 + j]!;
+      }
+    }
+    for (let j = 0; j < 3; j++) {
+      r[9 + j] =
+        inner[9]! * outer[j]! +
+        inner[10]! * outer[3 + j]! +
+        inner[11]! * outer[6 + j]! +
+        outer[9 + j]!;
+    }
+    return r;
+  };
+
   const allVerts: number[] = [];
   const allIdx: number[] = [];
-  let vOffset = 0;
+
+  const resolveObject = (
+    objectId: string,
+    transform: number[],
+    visited: Set<string>,
+  ): number => {
+    if (visited.has(objectId)) {
+      console.warn(`[3mf] ciclo em object ${objectId}, pulando`);
+      return 0;
+    }
+    const def = objects.get(objectId);
+    if (!def) {
+      console.warn(`[3mf] resolveObject: object ${objectId} não existe`);
+      return 0;
+    }
+    visited.add(objectId);
+    let addedVerts = 0;
+    if (def.mesh) {
+      const baseIdx = allVerts.length / 3;
+      const v = def.mesh.vertices;
+      const nVerts = v.length / 3;
+      const m = transform;
+      for (let i = 0; i < nVerts; i++) {
+        const x = v[i * 3]!;
+        const y = v[i * 3 + 1]!;
+        const z = v[i * 3 + 2]!;
+        allVerts.push(
+          x * m[0]! + y * m[3]! + z * m[6]! + m[9]!,
+          x * m[1]! + y * m[4]! + z * m[7]! + m[10]!,
+          x * m[2]! + y * m[5]! + z * m[8]! + m[11]!,
+        );
+      }
+      for (let i = 0; i < def.mesh.indices.length; i++) {
+        allIdx.push(def.mesh.indices[i]! + baseIdx);
+      }
+      addedVerts += nVerts;
+    }
+    for (const comp of def.components) {
+      addedVerts += resolveObject(
+        comp.objectId,
+        composeTransform(comp.matrix, transform),
+        visited,
+      );
+    }
+    visited.delete(objectId);
+    return addedVerts;
+  };
 
   for (const ref of refs) {
-    // Estratégia 1: instance_id como índice global
-    let item: BuildItem | undefined = buildItems[ref.instanceId];
-    let strategy = 'global';
-    if (!item || item.objectId !== ref.objectId) {
-      // Estratégia 2: instance_id como índice dentro dos items do mesmo objectId
-      item = itemsByObjectId.get(ref.objectId)?.[ref.instanceId];
-      strategy = 'per-objectId';
-    }
+    const sameObjItems = itemsByObjectId.get(ref.objectId) ?? [];
+    const item: BuildItem | undefined =
+      sameObjItems[ref.instanceId] ?? sameObjItems[0] ?? buildItems[ref.instanceId];
     if (!item) {
       console.warn(
-        `[3mf] ref (object_id=${ref.objectId}, instance_id=${ref.instanceId}) sem build item correspondente`,
+        `[3mf] ref (object_id=${ref.objectId}, instance_id=${ref.instanceId}) sem build item`,
       );
       continue;
     }
-    const obj = objects.get(item.objectId);
-    if (!obj) {
-      console.warn(`[3mf] objectId ${item.objectId} sem geometry`);
-      continue;
-    }
     console.log(
-      `[3mf] aplicando build item: objectId=${item.objectId} via ${strategy}, tx=${item.matrix.slice(9, 12).join(',')}, verts=${obj.vertices.length / 3}`,
+      `[3mf] resolvendo: ref=${ref.objectId} item=${item.objectId} tx=${item.matrix.slice(9, 12).join(',')}`,
     );
-
-    const m = item.matrix;
-    // 3MF transform: row-major; m[0..8] = rotação/escala 3x3, m[9..11] = translação
-    // Apply: [x' y' z'] = [x y z] * R + t
-    const nVerts = obj.vertices.length / 3;
-    for (let i = 0; i < nVerts; i++) {
-      const x = obj.vertices[i * 3]!;
-      const y = obj.vertices[i * 3 + 1]!;
-      const z = obj.vertices[i * 3 + 2]!;
-      const nx = x * m[0]! + y * m[3]! + z * m[6]! + m[9]!;
-      const ny = x * m[1]! + y * m[4]! + z * m[7]! + m[10]!;
-      const nz = x * m[2]! + y * m[5]! + z * m[8]! + m[11]!;
-      allVerts.push(nx, ny, nz);
+    // Tenta primeiro pelo ref.objectId (do model_instance — geralmente é o wrapper
+    // composto), depois pelo item.objectId (do build).
+    let added = resolveObject(ref.objectId, item.matrix, new Set());
+    if (added === 0 && ref.objectId !== item.objectId) {
+      console.warn(`[3mf] ref ${ref.objectId} gerou 0 verts; tentando item ${item.objectId}`);
+      added = resolveObject(item.objectId, item.matrix, new Set());
     }
-    for (let i = 0; i < obj.indices.length; i++) {
-      allIdx.push(obj.indices[i]! + vOffset);
-    }
-    vOffset += nVerts;
+    console.log(`[3mf] ref ${ref.objectId}: ${added} verts adicionados`);
   }
 
   if (allVerts.length === 0) {
