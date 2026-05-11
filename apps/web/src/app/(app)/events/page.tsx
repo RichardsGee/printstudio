@@ -3,8 +3,9 @@ import { createDb, events, printers } from '@printstudio/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
+import { requireCurrentOrgId } from '@/lib/current-org';
 
-async function loadEvents() {
+async function loadEvents(organizationId: string) {
   const url = process.env.DATABASE_URL;
   if (!url) return [];
   const db = createDb(url);
@@ -19,6 +20,7 @@ async function loadEvents() {
     })
     .from(events)
     .leftJoin(printers, eq(events.printerId, printers.id))
+    .where(eq(events.organizationId, organizationId))
     .orderBy(desc(events.createdAt))
     .limit(200);
 }
@@ -30,7 +32,8 @@ const SEVERITY_VARIANT = {
 } as const;
 
 export default async function EventsPage() {
-  const rows = await loadEvents();
+  const orgId = await requireCurrentOrgId();
+  const rows = await loadEvents(orgId);
 
   return (
     <div className="space-y-6">

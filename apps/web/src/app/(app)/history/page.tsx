@@ -3,8 +3,9 @@ import { createDb, printJobs, printers } from '@printstudio/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime, formatDuration } from '@/lib/utils';
+import { requireCurrentOrgId } from '@/lib/current-org';
 
-async function loadJobs() {
+async function loadJobs(organizationId: string) {
   const url = process.env.DATABASE_URL;
   if (!url) return [];
   const db = createDb(url);
@@ -20,6 +21,7 @@ async function loadJobs() {
     })
     .from(printJobs)
     .leftJoin(printers, eq(printJobs.printerId, printers.id))
+    .where(eq(printJobs.organizationId, organizationId))
     .orderBy(desc(printJobs.startedAt))
     .limit(100);
 }
@@ -32,7 +34,8 @@ const STATUS_VARIANT = {
 } as const;
 
 export default async function HistoryPage() {
-  const jobs = await loadJobs();
+  const orgId = await requireCurrentOrgId();
+  const jobs = await loadJobs(orgId);
 
   return (
     <div className="space-y-6">
