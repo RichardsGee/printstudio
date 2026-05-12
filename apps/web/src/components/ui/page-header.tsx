@@ -58,7 +58,8 @@ export function PageHeader({
 
   return (
     <header className={cn('space-y-1.5', className)}>
-      <div className="flex items-baseline gap-3 flex-wrap">
+      {/* Linha 1 (id + título) — sempre flex-row */}
+      <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
         {id ? (
           <span
             data-mc-id
@@ -67,13 +68,18 @@ export function PageHeader({
             {`// ${id}`}
           </span>
         ) : null}
-        <h1 className="text-heading uppercase tracking-wider">{title}</h1>
+        <h1 className="text-heading uppercase tracking-wider min-w-0 break-words">
+          {title}
+        </h1>
+        {/* Actions ou timestamp — desktop fica inline à direita, mobile quebra */}
         {actions ? (
-          <div className="ml-auto flex items-center gap-2">{actions}</div>
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {actions}
+          </div>
         ) : now ? (
           <span
             data-mc-num
-            className="ml-auto text-caption text-muted-foreground tabular-nums"
+            className="sm:ml-auto text-caption text-muted-foreground tabular-nums"
             suppressHydrationWarning
           >
             {formatTimestamp(now)}

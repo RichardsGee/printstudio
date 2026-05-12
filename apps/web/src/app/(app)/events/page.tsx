@@ -53,7 +53,7 @@ export default async function EventsPage() {
               >
                 <SeverityBadge severity={ev.severity} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-small">{ev.message}</div>
+                  <div className="text-body">{ev.message}</div>
                   <div className="text-caption text-muted-foreground mt-0.5">
                     <span data-mc-id>
                       {ev.printerName ?? 'SISTEMA'} · {ev.type}

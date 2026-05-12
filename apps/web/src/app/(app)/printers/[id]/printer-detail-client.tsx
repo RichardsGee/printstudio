@@ -199,28 +199,26 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             </div>
           ) : null}
         </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
+        {/* Controles — full-width em mobile pra touch, inline em sm+ */}
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:shrink-0">
           <Button
-            size="sm"
             variant="outline"
             onClick={() => send('pause')}
-            className="uppercase tracking-wider"
+            className="uppercase tracking-wider h-11 sm:h-9 flex-1 sm:flex-initial"
           >
             <Pause className="h-4 w-4 mr-1.5" /> Pausar
           </Button>
           <Button
-            size="sm"
             variant="outline"
             onClick={() => send('resume')}
-            className="uppercase tracking-wider"
+            className="uppercase tracking-wider h-11 sm:h-9 flex-1 sm:flex-initial"
           >
             <Play className="h-4 w-4 mr-1.5" /> Retomar
           </Button>
           <Button
-            size="sm"
             variant="destructive"
             onClick={() => send('stop')}
-            className="uppercase tracking-wider"
+            className="uppercase tracking-wider h-11 sm:h-9 flex-1 sm:flex-initial"
           >
             <Square className="h-4 w-4 mr-1.5" /> Parar
           </Button>

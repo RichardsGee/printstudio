@@ -89,7 +89,11 @@ function LoginForm() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full uppercase tracking-wider" disabled={pending}>
+            <Button
+              type="submit"
+              className="w-full uppercase tracking-wider h-11"
+              disabled={pending}
+            >
               {pending ? '[CONNECTING…]' : '[ENTRAR]'}
             </Button>
           </form>

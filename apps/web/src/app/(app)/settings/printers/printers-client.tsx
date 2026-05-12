@@ -131,11 +131,10 @@ function PrinterRowItem({ printer }: { printer: PrinterRow }) {
         {editing ? (
           <>
             <Button
-              size="sm"
               variant="outline"
               onClick={save}
               disabled={pending}
-              className="uppercase tracking-wider"
+              className="uppercase tracking-wider h-11 sm:h-9"
             >
               {pending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -145,10 +144,10 @@ function PrinterRowItem({ printer }: { printer: PrinterRow }) {
               <span className="sr-only">Salvar</span>
             </Button>
             <Button
-              size="sm"
               variant="ghost"
               onClick={cancel}
               disabled={pending}
+              className="h-11 sm:h-9"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Cancelar</span>
@@ -157,21 +156,19 @@ function PrinterRowItem({ printer }: { printer: PrinterRow }) {
         ) : (
           <>
             <Button
-              size="sm"
               variant="outline"
               onClick={startEdit}
               disabled={pending}
-              className="uppercase tracking-wider"
+              className="uppercase tracking-wider h-11 sm:h-9"
             >
               <Pencil className="h-4 w-4 mr-1.5" />
-              Renomear
+              <span className="hidden sm:inline">Renomear</span>
             </Button>
             <Button
-              size="sm"
               variant="ghost"
               onClick={remove}
               disabled={pending}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-11 sm:h-9"
             >
               {pending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
