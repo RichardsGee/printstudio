@@ -47,7 +47,7 @@ export default async function HistoryPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-small">
+            <table className="w-full text-body">
               <thead className="bg-muted/30 text-caption uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="text-left py-2 px-4" data-mc-label>Arquivo</th>

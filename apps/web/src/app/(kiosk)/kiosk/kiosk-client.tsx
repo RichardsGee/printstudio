@@ -159,19 +159,17 @@ export function KioskClient({ printers }: Props) {
           {editMode ? (
             <>
               <Button
-                size="sm"
                 variant="outline"
                 onClick={cancelEdit}
                 disabled={saving}
-                className="uppercase tracking-wider"
+                className="uppercase tracking-wider h-11 sm:h-9"
               >
                 Cancelar
               </Button>
               <Button
-                size="sm"
                 onClick={saveOrder}
                 disabled={saving}
-                className="uppercase tracking-wider"
+                className="uppercase tracking-wider h-11 sm:h-9"
               >
                 <Check className="h-4 w-4 mr-1.5" />
                 {saving ? 'Salvando…' : 'Salvar ordem'}
@@ -179,10 +177,9 @@ export function KioskClient({ printers }: Props) {
             </>
           ) : (
             <Button
-              size="sm"
               variant="outline"
               onClick={() => setEditMode(true)}
-              className="uppercase tracking-wider"
+              className="uppercase tracking-wider h-11 sm:h-9"
             >
               <Pencil className="h-4 w-4 mr-1.5" />
               Reordenar
