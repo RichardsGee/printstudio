@@ -23,7 +23,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/admin/waitlist', label: 'Waitlist', icon: ClipboardList, story: '9.3' },
-  { href: '/admin/users', label: 'Users · Orgs', icon: Users, story: '9.5' },
+  { href: '/admin/orgs', label: 'Users · Orgs', icon: Users, story: '9.5' },
   { href: '/admin/subscriptions', label: 'Assinaturas', icon: CreditCard, story: '9.7' },
   { href: '/admin/metrics', label: 'Métricas', icon: BarChart3, story: '9.8' },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText, story: '9.9' },
