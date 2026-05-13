@@ -10,6 +10,7 @@ import {
   type WaitlistRoleValue,
   type WaitlistStatusValue,
 } from '@/lib/waitlist-queries';
+import { ExportCsvButton } from '@/components/admin/export-csv-button';
 import { WaitlistFilters } from './_components/waitlist-filters';
 import { WaitlistTable } from './_components/waitlist-table';
 import { Pagination } from './_components/pagination';
@@ -92,6 +93,10 @@ export default async function AdminWaitlistPage({
           }
         />
         <MetricCard label="NEW · STATUS" value={metrics.byStatus.new ?? 0} />
+      </div>
+
+      <div className="flex items-center justify-end">
+        <ExportCsvButton endpoint="/api/admin/export/waitlist" />
       </div>
 
       <WaitlistFilters

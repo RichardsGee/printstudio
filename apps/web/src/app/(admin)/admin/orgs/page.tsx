@@ -6,6 +6,7 @@ import {
   getAdminOrgsMetrics,
   listAdminOrgs,
 } from '@/lib/admin-orgs-queries';
+import { ExportCsvButton } from '@/components/admin/export-csv-button';
 import { OrgsFilters } from './_components/orgs-filters';
 import { OrgsTable } from './_components/orgs-table';
 import { Pagination } from './_components/pagination';
@@ -81,6 +82,10 @@ export default async function AdminOrgsPage({
           value={(metrics.byPlan.pro ?? 0) + (metrics.byPlan.business ?? 0)}
           hint={`pro ${metrics.byPlan.pro ?? 0} · biz ${metrics.byPlan.business ?? 0}`}
         />
+      </div>
+
+      <div className="flex items-center justify-end">
+        <ExportCsvButton endpoint="/api/admin/export/orgs" />
       </div>
 
       <OrgsFilters planCounts={metrics.byPlan} />
