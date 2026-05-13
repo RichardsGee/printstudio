@@ -23,6 +23,7 @@ import {
   bambuCredentials,
   organizationMembers,
   encrypt,
+  decrypt,
   parseKey,
 } from '@printstudio/db';
 import { db } from '../db.js';
@@ -103,6 +104,79 @@ export async function registerBambuRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(bambuCredentials.organizationId, organizationId));
       logger.info({ organizationId, userId }, 'bambu credentials removed');
       return reply.code(204).send();
+    },
+  );
+
+  /**
+   * GET /api/bambu/devices — Story 8.5
+   *
+   * Lista devices Bambu da org logada (read-only). Diferente do
+   * verify-code, não faz login — usa o access_token criptografado
+   * já persistido em `bambu_credentials`.
+   *
+   * Usado pelo wizard de onboarding (`/onboarding/add-printers`) e
+   * pode ser reusado por outras telas futuras.
+   */
+  app.get(
+    '/api/bambu/devices',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const userId = req.user!.id;
+      const organizationId = await resolveUserOrganizationId(userId);
+      if (!organizationId) {
+        return reply.code(404).send(errorPayload('INTERNAL_ERROR', 'Sem organização'));
+      }
+
+      const rows = await db
+        .select({
+          encryptedAccessToken: bambuCredentials.encryptedAccessToken,
+          accessTokenExpiresAt: bambuCredentials.accessTokenExpiresAt,
+        })
+        .from(bambuCredentials)
+        .where(eq(bambuCredentials.organizationId, organizationId))
+        .limit(1);
+
+      const cred = rows[0];
+      if (!cred) {
+        return reply
+          .code(404)
+          .send(errorPayload('INTERNAL_ERROR', 'Bambu Cloud não vinculado'));
+      }
+      if (cred.accessTokenExpiresAt.getTime() <= Date.now()) {
+        return reply
+          .code(401)
+          .send(errorPayload('BAMBU_VERIFY_REQUIRED', 'Token Bambu expirado — reconecte a conta.'));
+      }
+
+      let accessToken: string;
+      try {
+        accessToken = decrypt(cred.encryptedAccessToken, credKey);
+      } catch (err) {
+        logger.error({ err, organizationId }, 'failed to decrypt bambu access token');
+        return reply
+          .code(500)
+          .send(errorPayload('INTERNAL_ERROR', 'Erro ao ler credenciais'));
+      }
+
+      try {
+        const devices = await listDevices(accessToken);
+        const mapped: BambuDevice[] = devices.map((d) => ({
+          serial: d.dev_id,
+          name: d.name,
+          model: d.dev_product_name,
+          online: d.online,
+        }));
+        return reply.send({ devices: mapped });
+      } catch (err) {
+        if (err instanceof BambuCloudError) {
+          logger.warn({ code: err.code, organizationId }, 'list devices falhou');
+          return reply.code(502).send(errorPayload(err.code, err.message));
+        }
+        logger.error({ err, organizationId }, 'list devices unexpected error');
+        return reply
+          .code(500)
+          .send(errorPayload('INTERNAL_ERROR', 'Erro ao listar impressoras'));
+      }
     },
   );
 

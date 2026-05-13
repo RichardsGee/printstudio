@@ -19,7 +19,7 @@ import { requireCurrentOrg } from '@/lib/current-org';
 const STEP_PATHS: Record<string, string> = {
   profile: '/onboarding/profile',
   bambu_connect: '/onboarding/bambu-connect',
-  printers: '/onboarding/printers',
+  printers: '/onboarding/add-printers',
 };
 
 export default async function OnboardingLayout({
