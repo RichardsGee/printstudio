@@ -8,8 +8,8 @@
  */
 
 import { redirect } from 'next/navigation';
-import { eq } from 'drizzle-orm';
-import { createDb, organizationMembers, organizations } from '@printstudio/db';
+import { eq, sql } from 'drizzle-orm';
+import { createDb, organizationMembers, organizations, printers } from '@printstudio/db';
 import { auth } from '@/lib/auth';
 
 let _db: ReturnType<typeof createDb> | null = null;
@@ -83,4 +83,55 @@ export async function requireCurrentOrg(): Promise<CurrentOrgSummary> {
   const org = rows[0];
   if (!org) redirect('/login');
   return org;
+}
+
+export interface OrgBambuStatus {
+  orgId: string;
+  onboardingStep: string;
+  onboardingDone: boolean;
+  printerCount: number;
+  /**
+   * True se o banner "Sua conta não tem impressora vinculada" deve
+   * aparecer (Story 8.7). Heurística: ainda não passou pelo step
+   * `done` do wizard E não tem nenhuma impressora cadastrada.
+   */
+  needsBambuBanner: boolean;
+}
+
+/**
+ * Carrega status de Bambu da org corrente pra decisão de UI (banner
+ * Story 8.7). Retorna `null` se sem session — caller decide como
+ * tratar (não redireciona pra evitar loop em telas públicas).
+ *
+ * 1 query JOIN em vez de 2 — economiza round-trip.
+ */
+export async function getCurrentOrgBambuStatus(): Promise<OrgBambuStatus | null> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+
+  const rows = await getDb()
+    .select({
+      orgId: organizations.id,
+      onboardingStep: organizations.onboardingStep,
+      printerCount: sql<number>`COALESCE(COUNT(${printers.id})::int, 0)`,
+    })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
+    .leftJoin(printers, eq(printers.organizationId, organizations.id))
+    .where(eq(organizationMembers.userId, String(userId)))
+    .groupBy(organizations.id, organizations.onboardingStep)
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  const onboardingDone = row.onboardingStep === 'done';
+  return {
+    orgId: row.orgId,
+    onboardingStep: row.onboardingStep,
+    onboardingDone,
+    printerCount: row.printerCount,
+    needsBambuBanner: !onboardingDone && row.printerCount === 0,
+  };
 }
