@@ -9,9 +9,7 @@ const baseConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    typedRoutes: false,
-  },
+  typedRoutes: false,
   eslint: {
     ignoreDuringBuilds: false,
   },

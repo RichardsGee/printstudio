@@ -9,7 +9,10 @@ const inter = Inter({
   display: 'swap',
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://guiaprint3d.com';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: 'GuiaPrint3D · Monitore suas Bambu Lab A1 de qualquer lugar',
   description:
     'Mission Control pra impressoras Bambu Lab A1. Kiosk de parede, cloud nativo, multi-impressora, histórico em tempo real.',
