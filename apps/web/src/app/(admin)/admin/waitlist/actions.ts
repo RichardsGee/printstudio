@@ -6,6 +6,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { createDb, inviteTokens, waitlist } from '@printstudio/db';
 import { requireSuperAdmin } from '@/lib/admin-auth';
+import { logAdminAction } from '@/lib/admin-audit';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -56,7 +57,7 @@ function fail(message: string): ActionResult {
 export async function updateWaitlistStatus(
   raw: { id: string; status: WaitlistStatusValue },
 ): Promise<ActionResult> {
-  await requireSuperAdmin();
+  const ctx = await requireSuperAdmin();
   const parsed = UpdateStatusInput.safeParse(raw);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? 'Inválido');
 
@@ -65,6 +66,13 @@ export async function updateWaitlistStatus(
       .update(waitlist)
       .set({ status: parsed.data.status, updatedAt: new Date() })
       .where(eq(waitlist.id, parsed.data.id));
+    void logAdminAction({
+      adminUserId: ctx.userId,
+      action: 'waitlist.status_changed',
+      targetType: 'waitlist',
+      targetId: parsed.data.id,
+      payload: { after: parsed.data.status },
+    });
     revalidatePath('/admin/waitlist');
     return { ok: true };
   } catch {
@@ -163,7 +171,7 @@ export async function removeWaitlistTag(
 export async function markWaitlistContacted(
   raw: { id: string },
 ): Promise<ActionResult> {
-  await requireSuperAdmin();
+  const ctx = await requireSuperAdmin();
   const parsed = IdInput.safeParse(raw);
   if (!parsed.success) return fail('ID inválido');
 
@@ -178,6 +186,12 @@ export async function markWaitlistContacted(
         updatedAt: now,
       })
       .where(eq(waitlist.id, parsed.data.id));
+    void logAdminAction({
+      adminUserId: ctx.userId,
+      action: 'waitlist.marked_contacted',
+      targetType: 'waitlist',
+      targetId: parsed.data.id,
+    });
     revalidatePath('/admin/waitlist');
     return { ok: true };
   } catch {
@@ -236,7 +250,7 @@ export interface GenerateInviteResult {
 export async function generateInviteToken(
   raw: { id: string },
 ): Promise<GenerateInviteResult> {
-  await requireSuperAdmin();
+  const ctx = await requireSuperAdmin();
   const parsed = IdInput.safeParse(raw);
   if (!parsed.success) return { ok: false, error: 'ID inválido' };
 
@@ -278,6 +292,14 @@ export async function generateInviteToken(
   } catch {
     return { ok: false, error: 'Erro ao gerar convite' };
   }
+
+  void logAdminAction({
+    adminUserId: ctx.userId,
+    action: 'waitlist.invite_generated',
+    targetType: 'waitlist',
+    targetId: parsed.data.id,
+    payload: { expiresAt: expiresAt.toISOString() },
+  });
 
   revalidatePath('/admin/waitlist');
   return {
