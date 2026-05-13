@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { z } from 'zod';
@@ -96,6 +97,20 @@ function LoginForm() {
             >
               {pending ? '[CONNECTING…]' : '[ENTRAR]'}
             </Button>
+            <div className="flex items-center justify-between pt-1 text-caption">
+              <Link
+                href="/esqueci-senha"
+                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                Esqueci minha senha
+              </Link>
+              <Link
+                href="/signup"
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                Criar conta
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>
