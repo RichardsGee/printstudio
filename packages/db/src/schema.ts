@@ -375,6 +375,23 @@ export const inviteTokens = pgTable('invite_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Epic 8 Story 8.10 — Onboarding analytics.
+ *
+ * Fire-and-forget log de eventos de funil pra computar drop-off por
+ * step. `event_type` é text (não enum) pra permitir novos eventos
+ * sem migration. `metadata` jsonb pra contexto livre (sem PII).
+ */
+export const onboardingEvents = pgTable('onboarding_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull(),
+  eventType: text('event_type').notNull(),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const bambuCredentials = pgTable('bambu_credentials', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id')

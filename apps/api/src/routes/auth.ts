@@ -9,6 +9,7 @@ import { db } from '../db.js';
 import { config } from '../config.js';
 import { requireAuth, SESSION_COOKIE } from '../middleware/auth.js';
 import { createUserWithOrg, SignupError } from '../services/signup.js';
+import { trackOnboardingEvent } from '../services/onboarding-analytics.js';
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -258,6 +259,11 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
         'signup ok',
       );
+
+      // Fire-and-forget tracking (Story 8.10). Não bloqueia a response.
+      void trackOnboardingEvent(result.organization.id, 'signup_completed', {
+        invitePrefilled: result.invitePrefilled,
+      });
 
       return reply
         .setCookie(SESSION_COOKIE, sessionId, {

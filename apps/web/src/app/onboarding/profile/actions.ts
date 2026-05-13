@@ -9,6 +9,7 @@ import {
   type OrgProfileInput,
 } from '@printstudio/shared';
 import { requireCurrentOrg } from '@/lib/current-org';
+import { trackOnboardingEvent } from '@/lib/onboarding-analytics';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -84,6 +85,13 @@ export async function updateOrgProfile(
       },
     };
   }
+
+  // Fire-and-forget tracking — Story 8.10
+  void trackOnboardingEvent(org.id, 'profile_completed', {
+    role: parsed.data.role,
+    state: parsed.data.state,
+    fromInvite: org.waitlistId !== null,
+  });
 
   // redirect() throws a special Next.js error — precisa ficar fora do
   // try/catch pra não ser capturado por engano.
