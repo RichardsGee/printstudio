@@ -4,7 +4,11 @@ import { redirect } from 'next/navigation';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { createDb, organizations, printers } from '@printstudio/db';
-import type { OnboardingErrorCode } from '@printstudio/shared';
+import {
+  canAddPrintersFor,
+  getPlanLimits,
+  type OnboardingErrorCode,
+} from '@printstudio/shared';
 import { requireCurrentOrg } from '@/lib/current-org';
 
 function getDb() {
@@ -32,8 +36,6 @@ export interface AddPrintersResult {
   };
 }
 
-const FREE_TIER_LIMIT = 1;
-
 /**
  * Server action do step 3 do wizard (Story 8.5).
  *
@@ -41,8 +43,9 @@ const FREE_TIER_LIMIT = 1;
  *   - INSERT printers com display_order incremental
  *   - UPDATE org.onboarding_step = 'done' + onboarding_completed_at = now()
  *
- * Free tier enforce: org.plan === 'free' permite max 1 printer (AC #2,
- * Story 8.6). Backend valida apesar do radio na UI.
+ * Plan enforcement via `canAddPrintersFor` do `@printstudio/shared`
+ * (Story 8.6) — single source of truth pros limites. Backend valida
+ * apesar do radio na UI.
  *
  * Em sucesso, redireciona pra `/kiosk` (Mission Control com a primeira
  * impressora). Erros voltam como result pra UI mostrar inline.
@@ -69,13 +72,15 @@ export async function addPrintersFromBambu(
     };
   }
 
-  // Free tier enforce — server-side (UI tb bloqueia via radio)
-  if (org.plan === 'free' && parsed.data.length > FREE_TIER_LIMIT) {
+  // Plan enforcement — usa helper compartilhado (Story 8.6)
+  const quota = canAddPrintersFor(org.plan, 0, parsed.data.length);
+  if (!quota.allowed) {
+    const limits = getPlanLimits(org.plan);
     return {
       ok: false,
       error: {
         code: 'FREE_TIER_LIMIT',
-        message: `Plano Free permite no máximo ${FREE_TIER_LIMIT} impressora. Faça upgrade ou selecione menos.`,
+        message: `Plano ${org.plan} permite no máximo ${limits.maxPrinters} impressora${limits.maxPrinters === 1 ? '' : 's'}. Selecione menos ou faça upgrade.`,
       },
     };
   }
