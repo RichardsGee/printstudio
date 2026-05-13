@@ -1,9 +1,10 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { createDb, waitlist } from '@printstudio/db';
+import { createDb, inviteTokens, waitlist } from '@printstudio/db';
 import { requireSuperAdmin } from '@/lib/admin-auth';
 
 function getDb() {
@@ -182,4 +183,107 @@ export async function markWaitlistContacted(
   } catch {
     return fail('Erro ao marcar contato');
   }
+}
+
+const INVITE_EXPIRY_DAYS = 30;
+const INVITE_TOKEN_BYTES = 24; // base64url(24 bytes) = 32 chars
+
+/**
+ * Gera token URL-safe random com ~190 bits de entropia.
+ * `crypto.randomBytes` é CSPRNG (não confundir com Math.random).
+ */
+function makeInviteToken(): string {
+  return randomBytes(INVITE_TOKEN_BYTES).toString('base64url');
+}
+
+/**
+ * Constrói URL completa do invite. Lê `NEXT_PUBLIC_APP_URL` ou cai
+ * em `NEXT_PUBLIC_SITE_URL` ou hardcoded prod default.
+ *
+ * Em dev local com `app.guiaprint3d.com` ainda não existe, retorna
+ * o origin que o admin pode trocar antes de mandar.
+ */
+function buildInviteUrl(token: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    'https://app.guiaprint3d.com';
+  const trimmed = base.replace(/\/$/, '');
+  return `${trimmed}/signup?invite=${encodeURIComponent(token)}`;
+}
+
+export interface GenerateInviteResult {
+  ok: boolean;
+  url?: string;
+  token?: string;
+  expiresAt?: string;
+  error?: string;
+}
+
+/**
+ * Gera invite token novo pro lead (Story 9.4).
+ *
+ * Transação atômica:
+ * 1. Invalida tokens ativos anteriores (set `used_at = now` neles)
+ *    — re-gerar nunca deixa 2 tokens ativos simultaneamente
+ * 2. INSERT novo token (32 chars URL-safe, 30 days expiry)
+ * 3. Atualiza `waitlist.status = 'invited'`
+ *
+ * Retorna URL completa pra UI mostrar no modal com botão "Copiar".
+ *
+ * Consumido por Story 8.9 (endpoint `GET /api/public/invite/:token`).
+ */
+export async function generateInviteToken(
+  raw: { id: string },
+): Promise<GenerateInviteResult> {
+  await requireSuperAdmin();
+  const parsed = IdInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: 'ID inválido' };
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+  const token = makeInviteToken();
+
+  const db = getDb();
+  try {
+    await db.transaction(async (tx) => {
+      // 1. Invalida tokens ativos anteriores deste lead
+      await tx
+        .update(inviteTokens)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(inviteTokens.waitlistId, parsed.data.id),
+            isNull(inviteTokens.usedAt),
+          ),
+        );
+
+      // 2. INSERT novo token
+      await tx.insert(inviteTokens).values({
+        token,
+        waitlistId: parsed.data.id,
+        expiresAt,
+      });
+
+      // 3. Marca lead como invited (preserva se já está em status
+      // mais avançado tipo 'converted' — não regride)
+      await tx
+        .update(waitlist)
+        .set({
+          status: sql`CASE WHEN ${waitlist.status} IN ('converted') THEN ${waitlist.status} ELSE 'invited'::waitlist_status END`,
+          updatedAt: now,
+        })
+        .where(eq(waitlist.id, parsed.data.id));
+    });
+  } catch {
+    return { ok: false, error: 'Erro ao gerar convite' };
+  }
+
+  revalidatePath('/admin/waitlist');
+  return {
+    ok: true,
+    token,
+    url: buildInviteUrl(token),
+    expiresAt: expiresAt.toISOString(),
+  };
 }

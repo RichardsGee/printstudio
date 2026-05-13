@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, type FormEvent } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Link as LinkIcon, Copy, Check } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import type { WaitlistRow } from '@/lib/waitlist-queries';
 import {
   addWaitlistTag,
+  generateInviteToken,
   removeWaitlistTag,
   updateWaitlistNotes,
 } from '../actions';
@@ -42,6 +43,36 @@ export function WaitlistDetailDrawer({
   const [tagInput, setTagInput] = useState('');
   const [tagError, setTagError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  function handleGenerateInvite() {
+    setInviteError(null);
+    startTransition(async () => {
+      const result = await generateInviteToken({ id: row.id });
+      if (result.ok && result.url) {
+        setInviteUrl(result.url);
+        setInviteExpiresAt(result.expiresAt ?? null);
+        setCopied(false);
+      } else {
+        setInviteError(result.error ?? 'Erro ao gerar convite');
+      }
+    });
+  }
+
+  async function handleCopy() {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback: prompt manual select
+      window.prompt('Copia o link:', inviteUrl);
+    }
+  }
 
   function saveNotes() {
     startTransition(async () => {
@@ -109,6 +140,79 @@ export function WaitlistDetailDrawer({
             value={formatDateTime(row.lastContactAt)}
           />
           <DetailRow label="CRIADO" value={formatDateTime(row.createdAt)} />
+        </div>
+
+        <div className="space-y-2">
+          <Label data-mc-label className="text-caption uppercase tracking-wider">
+            Convite de signup
+          </Label>
+          {inviteUrl ? (
+            <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-3">
+              <p
+                data-mc-id
+                className="text-caption font-mono uppercase tracking-wider text-primary"
+              >
+                {'// LINK · GENERATED'}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <code className="flex-1 break-all rounded bg-background px-2 py-1.5 font-mono text-caption">
+                  {inviteUrl}
+                </code>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={copied ? 'outline' : 'default'}
+                  onClick={handleCopy}
+                  className="gap-1.5 shrink-0"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-3" aria-hidden="true" />
+                      Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-3" aria-hidden="true" />
+                      Copiar
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-caption text-muted-foreground">
+                Válido até{' '}
+                <span data-mc-num className="font-mono">
+                  {formatDateTime(inviteExpiresAt ? new Date(inviteExpiresAt) : null)}
+                </span>
+                {' · '}envie pelo WhatsApp ou email manualmente.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleGenerateInvite}
+                disabled={pending}
+                className="text-caption text-muted-foreground"
+              >
+                {pending ? 'Gerando…' : 'Gerar novo (invalida este)'}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleGenerateInvite}
+              disabled={pending}
+              className="gap-1.5"
+            >
+              <LinkIcon className="size-3.5" aria-hidden="true" />
+              {pending ? 'Gerando…' : 'Gerar link de convite'}
+            </Button>
+          )}
+          {inviteError && (
+            <p className="text-caption text-destructive" role="alert">
+              {inviteError}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
