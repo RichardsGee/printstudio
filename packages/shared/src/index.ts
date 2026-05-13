@@ -5,6 +5,7 @@ export * from './hms-codes.js';
 export * from './bambu-cloud.js';
 export * from './cached-model.js';
 export * from './waitlist.js';
+export * from './auth.js';
 
 export const APP_NAME = 'PrintStudio';
 export const DEFAULT_BRIDGE_PORT = 8080;
