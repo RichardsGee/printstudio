@@ -99,6 +99,13 @@
       "when": 1778653100000,
       "tag": "0013_onboarding_events",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778653500000,
+      "tag": "0014_super_admin",
+      "breakpoints": true
     }
   ]
 }

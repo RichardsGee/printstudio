@@ -252,6 +252,9 @@ export const users = pgTable('users', {
     telegramChatId?: string;
     email?: string;
   }>(),
+  // Epic 9 — Internal Admin Panel. Single super_admin V1 (só Richard).
+  // NUNCA editável via API normal (Zod strict + strip no PATCH).
+  isSuperAdmin: boolean('is_super_admin').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
