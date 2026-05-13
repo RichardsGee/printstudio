@@ -1,9 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { and, eq, gte, sql } from 'drizzle-orm';
-import { printers, printerState, temperatureSamples } from '@printstudio/db';
+import { organizationMembers, printers, printerState, temperatureSamples } from '@printstudio/db';
 import { db } from '../db.js';
+import { logger } from '../logger.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { canAddPrinter } from '../services/plan-limits.js';
+
+async function resolveUserOrganizationId(userId: string): Promise<string | null> {
+  const rows = await db
+    .select({ orgId: organizationMembers.organizationId })
+    .from(organizationMembers)
+    .where(eq(organizationMembers.userId, userId))
+    .limit(1);
+  return rows[0]?.orgId ?? null;
+}
 
 const CreatePrinterSchema = z.object({
   name: z.string().min(1),
@@ -47,7 +58,37 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
     if (!parse.success) {
       return reply.code(400).send({ error: 'invalid body', issues: parse.error.issues });
     }
-    const [created] = await db.insert(printers).values(parse.data).returning();
+
+    const userId = req.user!.id;
+    const organizationId = await resolveUserOrganizationId(userId);
+    if (!organizationId) {
+      logger.error({ userId }, 'user sem organização — multi-tenant inconsistente');
+      return reply.code(500).send({
+        error: { code: 'INTERNAL_ERROR', message: 'Usuário sem organização' },
+      });
+    }
+
+    const quota = await canAddPrinter(organizationId);
+    if (!quota.allowed) {
+      logger.info(
+        { userId, organizationId, plan: quota.plan, limit: quota.limit },
+        'printer add blocked by plan quota',
+      );
+      return reply.code(403).send({
+        error: {
+          code: 'LIMIT_EXCEEDED',
+          message: quota.reason ?? 'Limite do plano atingido',
+          plan: quota.plan,
+          limit: quota.limit,
+          remaining: quota.remaining,
+        },
+      });
+    }
+
+    const [created] = await db
+      .insert(printers)
+      .values({ ...parse.data, organizationId })
+      .returning();
     return reply.code(201).send(created);
   });
 
