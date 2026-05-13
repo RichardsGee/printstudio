@@ -92,6 +92,13 @@
       "when": 1778645797378,
       "tag": "0012_fixed_valeria_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778653100000,
+      "tag": "0013_onboarding_events",
+      "breakpoints": true
     }
   ]
 }

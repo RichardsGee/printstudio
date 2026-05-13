@@ -10,6 +10,7 @@ import {
   type OnboardingErrorCode,
 } from '@printstudio/shared';
 import { requireCurrentOrg } from '@/lib/current-org';
+import { trackOnboardingEvent } from '@/lib/onboarding-analytics';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -141,6 +142,12 @@ export async function addPrintersFromBambu(
     };
   }
 
+  // Fire-and-forget tracking — Story 8.10
+  void trackOnboardingEvent(org.id, 'printers_added', {
+    count: parsed.data.length,
+    plan: org.plan,
+  });
+
   // redirect() throws NEXT_REDIRECT — fora do try/catch
   redirect('/kiosk');
 }
@@ -175,6 +182,9 @@ export async function skipAddPrinters(): Promise<AddPrintersResult> {
       error: { code: 'INTERNAL_ERROR', message: 'Erro ao pular.' },
     };
   }
+
+  // Fire-and-forget tracking — Story 8.10
+  void trackOnboardingEvent(org.id, 'printers_skipped');
 
   redirect('/dashboard');
 }

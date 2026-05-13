@@ -40,3 +40,20 @@ export type OnboardingErrorCode =
   | 'UNAUTHORIZED'
   | 'WRONG_STEP'
   | 'INTERNAL_ERROR';
+
+/**
+ * Story 8.10 — Onboarding analytics event types.
+ *
+ * Disparados fire-and-forget em pontos-chave do funil. Persistidos
+ * na tabela `onboarding_events`. Admin Panel (Story 9.8) computa
+ * drop-off rate por step.
+ */
+export const ONBOARDING_EVENT_TYPES = [
+  'signup_completed',
+  'profile_completed',
+  'bambu_completed',
+  'bambu_skipped',
+  'printers_added',
+  'printers_skipped',
+] as const;
+export type OnboardingEventType = (typeof ONBOARDING_EVENT_TYPES)[number];

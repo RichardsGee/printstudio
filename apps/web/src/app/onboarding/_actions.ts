@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { createDb, organizations } from '@printstudio/db';
 import type { OnboardingErrorCode } from '@printstudio/shared';
 import { requireCurrentOrg } from '@/lib/current-org';
+import { trackOnboardingEvent } from '@/lib/onboarding-analytics';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -47,6 +48,9 @@ export async function advanceOnboardingStep(): Promise<OnboardingActionResult> {
     };
   }
 
+  // Fire-and-forget tracking — Story 8.10
+  void trackOnboardingEvent(org.id, 'bambu_completed');
+
   redirect('/onboarding/add-printers');
 }
 
@@ -82,6 +86,9 @@ export async function skipBambuConnect(): Promise<OnboardingActionResult> {
       error: { code: 'INTERNAL_ERROR', message: 'Erro ao pular.' },
     };
   }
+
+  // Fire-and-forget tracking — Story 8.10
+  void trackOnboardingEvent(org.id, 'bambu_skipped');
 
   redirect('/dashboard');
 }
