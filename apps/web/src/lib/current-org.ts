@@ -9,7 +9,7 @@
 
 import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
-import { createDb, organizationMembers } from '@printstudio/db';
+import { createDb, organizationMembers, organizations } from '@printstudio/db';
 import { auth } from '@/lib/auth';
 
 let _db: ReturnType<typeof createDb> | null = null;
@@ -45,4 +45,42 @@ export async function requireCurrentOrgId(): Promise<string> {
   const orgId = await getCurrentOrgId();
   if (!orgId) redirect('/login');
   return orgId;
+}
+
+export interface CurrentOrgSummary {
+  id: string;
+  name: string;
+  plan: string;
+  onboardingStep: string;
+  onboardingCompletedAt: Date | null;
+  role: string | null;
+  state: string | null;
+  city: string | null;
+  waitlistId: string | null;
+}
+
+/**
+ * Retorna a org corrente com colunas relevantes pro onboarding wizard
+ * (Story 8.3). Redireciona pra /login se sem session.
+ */
+export async function requireCurrentOrg(): Promise<CurrentOrgSummary> {
+  const orgId = await requireCurrentOrgId();
+  const rows = await getDb()
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      plan: organizations.plan,
+      onboardingStep: organizations.onboardingStep,
+      onboardingCompletedAt: organizations.onboardingCompletedAt,
+      role: organizations.role,
+      state: organizations.state,
+      city: organizations.city,
+      waitlistId: organizations.waitlistId,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+  const org = rows[0];
+  if (!org) redirect('/login');
+  return org;
 }
