@@ -395,6 +395,26 @@ export const onboardingEvents = pgTable('onboarding_events', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Epic 9 Story 9.9 — Admin audit log.
+ *
+ * Trail de ações destrutivas/sensitive feitas no Admin Panel.
+ * Compliance + debugging. `payload` jsonb pra `{ before, after,
+ * justification, ...metadata }` (NUNCA PII sensível).
+ */
+export const adminAuditLog = pgTable('admin_audit_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  adminUserId: uuid('admin_user_id')
+    .references(() => users.id)
+    .notNull(),
+  action: text('action').notNull(),
+  targetType: text('target_type').notNull(),
+  targetId: uuid('target_id'),
+  payload: jsonb('payload').$type<Record<string, unknown>>(),
+  ipAddress: inet('ip_address'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const bambuCredentials = pgTable('bambu_credentials', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id')

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createDb, organizations } from '@printstudio/db';
 import { PLAN_KEYS } from '@printstudio/shared';
 import { requireSuperAdmin } from '@/lib/admin-auth';
+import { logAdminAction } from '@/lib/admin-audit';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -79,21 +80,20 @@ export async function changeOrgPlan(
       .set({ plan: parsed.data.plan, updatedAt: new Date() })
       .where(eq(organizations.id, parsed.data.orgId));
 
-    // 3. Trail mínimo via console (Story 9.9 fará table real).
+    // 3. Audit log (Story 9.9 — persiste em admin_audit_log).
     // Cache de plan-limits no apps/api tem TTL 60s (Story 8.6) —
     // TTL natural cobre delay aceitável até refresh.
-    console.warn(
-      JSON.stringify({
-        event: 'admin.org_plan_changed',
-        adminUserId: ctx.userId,
-        adminEmail: ctx.email,
-        orgId: parsed.data.orgId,
+    void logAdminAction({
+      adminUserId: ctx.userId,
+      action: 'org.plan_changed',
+      targetType: 'org',
+      targetId: parsed.data.orgId,
+      payload: {
         before: oldPlan,
         after: parsed.data.plan,
         justification: parsed.data.justification,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+      },
+    });
   } catch {
     return { ok: false, error: 'Erro ao mudar plano' };
   }
