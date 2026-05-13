@@ -47,7 +47,7 @@ export async function advanceOnboardingStep(): Promise<OnboardingActionResult> {
     };
   }
 
-  redirect('/onboarding/printers');
+  redirect('/onboarding/add-printers');
 }
 
 /**
