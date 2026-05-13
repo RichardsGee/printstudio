@@ -6,7 +6,11 @@ const ConfigSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   DATABASE_URL: z.string().url(),
   API_PORT: z.coerce.number().int().positive().default(4000),
-  API_CORS_ORIGIN: z.string().url(),
+  // Aceita múltiplas origins separadas por vírgula (ex: "https://app.foo.com,http://localhost:3000")
+  API_CORS_ORIGIN: z.string(),
+  // Origins extras pra rotas públicas (landing form em guiaprint3d.com).
+  // Opcional, comma-separated. Concatena com API_CORS_ORIGIN se presente.
+  API_PUBLIC_CORS_ORIGINS: z.string().optional(),
   AUTH_SECRET: z.string().min(16),
   CLOUD_API_TOKEN: z.string().min(16),
   // Chave master AES-256 (32 bytes base64) pra encriptar tokens Bambu

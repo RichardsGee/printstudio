@@ -55,6 +55,24 @@ export const organizationMemberRoleEnum = pgEnum('organization_member_role', [
   'member',
 ]);
 
+// Epic 7 — Waitlist CRM-light
+export const waitlistStatusEnum = pgEnum('waitlist_status', [
+  'new',          // recém cadastrado
+  'contacted',    // primeiro contato feito
+  'engaged',      // respondeu, interagindo
+  'invited',      // recebeu token de signup (Epic 8)
+  'converted',    // virou user real
+  'lost',         // não respondeu / desistiu
+]);
+
+export const waitlistRoleEnum = pgEnum('waitlist_role', [
+  'hobbyist',     // 1 Bambu em casa
+  'small_shop',   // print shop pequena 1-3 imp
+  'studio',       // estudio prototipagem 4-10
+  'business',     // operação 11+ impressoras
+  'other',        // educação, comunidade maker
+]);
+
 /**
  * Organização — unidade de tenancy no PrintStudio. Cada org tem suas
  * próprias impressoras, jobs, eventos e (futuro) credenciais Bambu cloud.
@@ -65,6 +83,17 @@ export const organizationMemberRoleEnum = pgEnum('organization_member_role', [
 export const organizations = pgTable('organizations', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
+  // Epic 8 — Onboarding state machine (nullable até story 8.2 popular)
+  onboardingStep: text('onboarding_step').default('profile').notNull(),
+  onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
+  // Qualificação (sincronizada com waitlist_role)
+  role: text('role'),
+  state: text('state'),
+  city: text('city'),
+  // Plano comercial (Epic 6) — default 'free'
+  plan: text('plan').default('free').notNull(),
+  // Lead de origem (Epic 8 story 8.9 invite token)
+  waitlistId: uuid('waitlist_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -281,6 +310,71 @@ export const cachedModels = pgTable(
   }),
 );
 
+/**
+ * Epic 7 — Waitlist (CRM-light)
+ *
+ * Captura leads qualificados antes do launch público. Não é fila silenciosa —
+ * tem status workflow, tags, notes, region, role pra Admin Panel (Epic 9)
+ * trabalhar a base.
+ *
+ * IP/UA/UTM são capturados pra rate limit anti-spam + analytics.
+ */
+export const waitlist = pgTable('waitlist', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  bambuCount: integer('bambu_count').notNull(),
+
+  // Qualificação
+  role: waitlistRoleEnum('role').default('other').notNull(),
+  state: text('state'),
+  city: text('city'),
+
+  // Comunidade V1.1 (Telegram + WhatsApp groups)
+  telegramHandle: text('telegram_handle'),
+  phone: text('phone'),
+
+  // CRM workflow
+  status: waitlistStatusEnum('status').default('new').notNull(),
+  tags: text('tags').array().default(sql`'{}'::text[]`).notNull(),
+  notes: text('notes'),
+  contactedAt: timestamp('contacted_at', { withTimezone: true }),
+  lastContactAt: timestamp('last_contact_at', { withTimezone: true }),
+
+  // Tracking + rate limit
+  sourceUtm: jsonb('source_utm').$type<{
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_content?: string;
+    utm_term?: string;
+  }>(),
+  referrer: text('referrer'),
+  userAgent: text('user_agent'),
+  ipAddress: inet('ip_address'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Epic 8 — Invite tokens (Story 8.9)
+ *
+ * Token gerado pelo Admin Panel (Epic 9 story 9.4) quando Richard libera
+ * lead da waitlist pra signup. Lead recebe link manual (WhatsApp/email)
+ * com /signup?invite={token} — pre-fill dados do waitlist.
+ *
+ * Token format: crypto.randomBytes(24).toString('base64url') = 32 chars.
+ * Expiração: 30 dias. Single use (used_at marca).
+ */
+export const inviteTokens = pgTable('invite_tokens', {
+  token: text('token').primaryKey(),
+  waitlistId: uuid('waitlist_id').references(() => waitlist.id, { onDelete: 'cascade' }),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const bambuCredentials = pgTable('bambu_credentials', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id')
@@ -393,3 +487,7 @@ export type BambuCredential = typeof bambuCredentials.$inferSelect;
 export type NewBambuCredential = typeof bambuCredentials.$inferInsert;
 export type CachedModel = typeof cachedModels.$inferSelect;
 export type NewCachedModel = typeof cachedModels.$inferInsert;
+export type Waitlist = typeof waitlist.$inferSelect;
+export type NewWaitlist = typeof waitlist.$inferInsert;
+export type InviteToken = typeof inviteTokens.$inferSelect;
+export type NewInviteToken = typeof inviteTokens.$inferInsert;
