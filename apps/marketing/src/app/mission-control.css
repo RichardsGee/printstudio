@@ -1,0 +1,245 @@
+/* ==========================================================================
+   MISSION CONTROL THEME (PrintStudio global)
+   --------------------------------------------------------------------------
+   Tema sci-fi/comando — visual de Mission Control (NASA, governo, Matrix-ish).
+   Aplicado globalmente em <body class="kiosk-mission"> via app/layout.tsx
+   pra que todas as rotas (app, kiosk, login) herdem grid + monospace + cores.
+
+   Páginas que queiram embeddar o tema dentro de outro contexto (ex: showcase
+   no /design-system) devem usar o modificador .demo-mode pra desativar
+   pseudo-elementos fixed (scanlines, vinheta).
+
+   Classe principal: .kiosk-mission (mantida pelo nome histórico — não renomear
+   pra evitar quebrar overrides; tratá-la como "mission-control" semanticamente).
+   --------------------------------------------------------------------------
+*/
+
+.kiosk-mission {
+  --mc-accent: #22d3ee;          /* cyan brilhante = primário */
+  --mc-accent-soft: #0891b2;     /* cyan escuro */
+  --mc-warning: #fbbf24;         /* amber */
+  --mc-danger: #ef4444;
+  --mc-success: #34d399;
+  --mc-bg: #050810;
+  --mc-fg: #d1d5db;
+  --mc-fg-dim: #6b7280;
+  --mc-grid-line: rgba(34, 211, 238, 0.05);
+  --mc-grid-line-strong: rgba(34, 211, 238, 0.12);
+
+  background-color: var(--mc-bg);
+  background-image:
+    /* grid fino */
+    linear-gradient(0deg, var(--mc-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mc-grid-line) 1px, transparent 1px),
+    /* grid grosso a cada 5 quadras */
+    linear-gradient(0deg, var(--mc-grid-line-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mc-grid-line-strong) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  background-position: 0 0;
+  color: var(--mc-fg);
+  position: relative;
+  /* TIPOGRAFIA — tudo monospace por padrão, exceto onde for sobrescrito.
+     Mantém canvas 3D e imagens intactos. */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  letter-spacing: 0.02em;
+  /* Boot fade-in quando a rota carrega */
+  animation: mc-boot 480ms ease-out;
+}
+
+@keyframes mc-boot {
+  0%   { opacity: 0; filter: brightness(0.4); }
+  60%  { opacity: 1; filter: brightness(1.2); }
+  100% { opacity: 1; filter: brightness(1); }
+}
+
+/* Scanlines sutis ANIMADAS — descem devagar simulando refresh de CRT.
+   Animação no background-position pra evitar reflow. */
+.kiosk-mission::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.018) 0px,
+    rgba(255, 255, 255, 0.018) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 50;
+  mix-blend-mode: screen;
+  animation: mc-scanline-drift 6s linear infinite;
+}
+
+/* Demo mode — desabilita os pseudo-elementos fixed pra que a tema
+   possa ser renderizada dentro de outras páginas (ex: design system)
+   sem cobrir o viewport com scanlines/vinheta. */
+.kiosk-mission.demo-mode::before,
+.kiosk-mission.demo-mode::after {
+  display: none;
+}
+.kiosk-mission.demo-mode {
+  animation: none;
+  background-color: transparent;
+}
+
+@keyframes mc-scanline-drift {
+  from { background-position: 0 0; }
+  to   { background-position: 0 24px; }
+}
+
+/* Vinheta sutil pra escurecer cantos */
+.kiosk-mission::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  z-index: 49;
+}
+
+/* Cards com canto cortado e brackets nos cantos */
+.kiosk-mission [data-mc-card] {
+  border-color: var(--mc-accent-soft);
+  border-radius: 0;
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.03) 0%, transparent 50%),
+    rgba(5, 8, 16, 0.85);
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 0 30px rgba(34, 211, 238, 0.06);
+}
+
+.kiosk-mission [data-mc-card]::before,
+.kiosk-mission [data-mc-card]::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--mc-accent);
+  pointer-events: none;
+}
+.kiosk-mission [data-mc-card]::before {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+.kiosk-mission [data-mc-card]::after {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Headers / IDs em monospace */
+.kiosk-mission [data-mc-id],
+.kiosk-mission [data-mc-label] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  letter-spacing: 0.08em;
+}
+
+/* LED status — bolinha pulsante */
+.kiosk-mission [data-mc-led] {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor, 0 0 2px currentColor;
+  animation: mc-led-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mc-led-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Banner — visual de cabeçalho de mission control */
+.kiosk-mission [data-mc-banner] {
+  border-radius: 0;
+  border: 1px solid var(--mc-accent-soft);
+  border-left: 3px solid var(--mc-accent);
+  background:
+    linear-gradient(90deg, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+    rgba(5, 8, 16, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.05);
+  position: relative;
+}
+
+.kiosk-mission [data-mc-banner]::after {
+  /* pequeno triângulo no canto sup-direito tipo "marker" */
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 0 12px 12px 0;
+  border-color: transparent var(--mc-accent) transparent transparent;
+  opacity: 0.6;
+}
+
+/* Override do primary global pra cyan dentro do kiosk */
+.kiosk-mission .text-primary { color: var(--mc-accent) !important; }
+.kiosk-mission .bg-primary { background-color: var(--mc-accent) !important; }
+.kiosk-mission .border-primary { border-color: var(--mc-accent) !important; }
+.kiosk-mission .from-primary\/80 { --tw-gradient-from: rgba(34, 211, 238, 0.8) !important; }
+.kiosk-mission .to-primary { --tw-gradient-to: var(--mc-accent) !important; }
+
+/* Progress bar como gauge segmentado — substitui visual do
+   bg-gradient. 20 segmentos, lit conforme progresso. */
+.kiosk-mission [data-mc-gauge] {
+  display: flex;
+  gap: 1px;
+  background: rgba(34, 211, 238, 0.08);
+  padding: 2px;
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+.kiosk-mission [data-mc-gauge-cell] {
+  flex: 1;
+  height: 100%;
+  background: rgba(34, 211, 238, 0.15);
+  transition: background 240ms ease, box-shadow 240ms ease;
+}
+
+.kiosk-mission [data-mc-gauge-cell].lit {
+  background: var(--mc-accent);
+  box-shadow: 0 0 4px var(--mc-accent), inset 0 0 2px rgba(255, 255, 255, 0.4);
+}
+
+/* Glitch sutil — disparado raramente em alguns elementos */
+.kiosk-mission [data-mc-glitch] {
+  animation: mc-glitch 14s steps(1, end) infinite;
+}
+
+@keyframes mc-glitch {
+  0%, 97%, 100%  { transform: translate(0, 0); filter: none; }
+  97.4%          { transform: translate(1px, 0); filter: hue-rotate(15deg); }
+  97.8%          { transform: translate(-1px, 1px); filter: hue-rotate(-15deg); }
+  98.2%          { transform: translate(0, -1px); filter: none; }
+}
+
+/* Numeric counter com font-feature pra tabular */
+.kiosk-mission [data-mc-num] {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  letter-spacing: 0.05em;
+}
+
+/* Blueprint tint — gira o azul claro do PNG pra um cyan mais
+   escuro tipo --mc-accent-soft (#0891b2), igual o fundo dos
+   labels [ACTIVE] / // STN-XXXX. Brightness reduzido + leve
+   redução de saturação pra deixar maduro/profundo. */
+.kiosk-mission .kiosk-blueprint-tint {
+  filter:
+    hue-rotate(-18deg)
+    saturate(1.05)
+    brightness(0.7)
+    contrast(1.15);
+}
