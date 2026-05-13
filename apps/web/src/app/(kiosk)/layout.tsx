@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { AppHeader } from '@/components/app-header';
+import { NoBambuBanner } from '@/components/no-bambu-banner';
 
 /**
  * Layout do modo kiosk — header global + área fullscreen pro grid de
@@ -20,6 +21,7 @@ export default async function KioskLayout({
   return (
     <div className="min-h-dvh flex flex-col">
       <AppHeader userEmail={session.user.email} />
+      <NoBambuBanner />
       <main className="flex-1">{children}</main>
     </div>
   );
