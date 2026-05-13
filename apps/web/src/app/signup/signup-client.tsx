@@ -22,6 +22,11 @@ interface SignupClientProps {
     name: string;
     email: string;
   };
+  /**
+   * Mensagem mostrada quando o invite token foi passado mas era
+   * inválido/expirado/usado. Signup procede normal (sem pre-fill).
+   */
+  inviteWarning?: string;
 }
 
 interface PasswordRule {
@@ -50,7 +55,7 @@ const PASSWORD_RULES: PasswordRule[] = [
  *
  * Pre-fill via invite token (Server Component) — Story 8.9.
  */
-export function SignupClient({ inviteToken, prefill }: SignupClientProps) {
+export function SignupClient({ inviteToken, prefill, inviteWarning }: SignupClientProps) {
   const router = useRouter();
   const [name, setName] = useState(prefill?.name ?? '');
   const [email, setEmail] = useState(prefill?.email ?? '');
@@ -174,6 +179,15 @@ export function SignupClient({ inviteToken, prefill }: SignupClientProps) {
             >
               <Check className="size-3" aria-hidden="true" />
               Convite confirmado
+            </p>
+          )}
+          {inviteWarning && (
+            <p
+              role="status"
+              data-mc-id
+              className="mt-2 inline-flex w-fit items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-caption uppercase tracking-wider text-warning"
+            >
+              {inviteWarning}
             </p>
           )}
         </CardHeader>

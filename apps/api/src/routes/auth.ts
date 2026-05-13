@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import argon2 from 'argon2';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import { inviteTokens, sessions, users, waitlist } from '@printstudio/db';
 import { SignupSchema, type SignupErrorCode } from '@printstudio/shared';
@@ -290,41 +290,50 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
-   * GET /api/public/invite/:token — Story 8.1 (pre-fill da página /signup)
+   * GET /api/public/invite/:token — Story 8.1 + refinado Story 8.9
    *
-   * Resolve um invite token e retorna apenas name+email do waitlist
-   * linked se o token for válido (não expirado, não usado). Endpoint
-   * público (sem auth) — usado pelo Server Component da `/signup` page.
+   * Resolve um invite token e retorna name+email do waitlist linked.
+   * Endpoint público (sem auth) — usado pelo Server Component da
+   * `/signup` page pra pre-fill.
    *
-   * Não consome o token — só consulta. O consume acontece no momento
-   * do signup real (transação do service createUserWithOrg).
+   * Status codes (Story 8.9 AC #1):
+   * - 200: token válido + prefill
+   * - 404: token não existe (INVITE_NOT_FOUND)
+   * - 410: token existe mas usado ou expirado (INVITE_USED / INVITE_EXPIRED)
+   *
+   * Não consome o token — só consulta. O consume acontece na transação
+   * do signup real (service createUserWithOrg, Story 8.2).
    */
   app.get<{ Params: { token: string } }>(
     '/api/public/invite/:token',
     async (req, reply) => {
       const token = req.params.token;
       if (!token || token.length > 200) {
-        return reply.code(404).send({ error: { code: 'INVITE_INVALID' } });
+        return reply.code(404).send({ error: { code: 'INVITE_NOT_FOUND' } });
       }
 
-      const now = new Date();
+      // 1. Busca SEM filtrar usado/expirado pra distinguir status codes
       const rows = await db
         .select({
           waitlistId: inviteTokens.waitlistId,
+          usedAt: inviteTokens.usedAt,
+          expiresAt: inviteTokens.expiresAt,
         })
         .from(inviteTokens)
-        .where(
-          and(
-            eq(inviteTokens.token, token),
-            isNull(inviteTokens.usedAt),
-            gt(inviteTokens.expiresAt, now),
-          ),
-        )
+        .where(eq(inviteTokens.token, token))
         .limit(1);
 
       const tokenRow = rows[0];
-      if (!tokenRow?.waitlistId) {
-        return reply.code(404).send({ error: { code: 'INVITE_INVALID' } });
+      if (!tokenRow || !tokenRow.waitlistId) {
+        return reply.code(404).send({ error: { code: 'INVITE_NOT_FOUND' } });
+      }
+
+      const now = new Date();
+      if (tokenRow.usedAt) {
+        return reply.code(410).send({ error: { code: 'INVITE_USED' } });
+      }
+      if (tokenRow.expiresAt.getTime() <= now.getTime()) {
+        return reply.code(410).send({ error: { code: 'INVITE_EXPIRED' } });
       }
 
       const waitlistRows = await db
@@ -335,7 +344,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
       const waitlistRow = waitlistRows[0];
       if (!waitlistRow) {
-        return reply.code(404).send({ error: { code: 'INVITE_INVALID' } });
+        // Edge case: token existe mas waitlist foi deletado (ON DELETE
+        // CASCADE deveria limpar isso, mas defensive).
+        return reply.code(404).send({ error: { code: 'INVITE_NOT_FOUND' } });
       }
 
       return reply.send({
