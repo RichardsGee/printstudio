@@ -7,6 +7,7 @@ import { Features } from './features';
 import { WaitlistForm } from './waitlist-form';
 import { DemoModal } from './demo-modal';
 import { SiteFooter } from './site-footer';
+import { trackEvent } from '@/lib/analytics';
 
 /**
  * Orquestra o state da landing: modal de demo + scroll suave pro form
@@ -17,6 +18,7 @@ export function LandingPageClient() {
   const [demoOpen, setDemoOpen] = useState(false);
 
   const handleWaitlistClick = useCallback(() => {
+    trackEvent('cta_waitlist_click');
     const el = document.getElementById('waitlist');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -24,6 +26,7 @@ export function LandingPageClient() {
   }, []);
 
   const handleDemoClick = useCallback(() => {
+    trackEvent('demo_modal_open');
     setDemoOpen(true);
   }, []);
 

@@ -51,11 +51,17 @@ export function LegalDocLayout({
 }
 
 /**
- * Heading H2 com tokens Mission Control.
+ * Heading H2 com tokens Mission Control. `id` opcional habilita
+ * deep-link/âncora (ex: `/politica-de-privacidade#cookies`).
  */
-export function H2({ children }: { children: ReactNode }) {
+export function H2({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <h2 className="text-heading uppercase tracking-wider pt-6 first:pt-0">{children}</h2>
+    <h2
+      id={id}
+      className="text-heading uppercase tracking-wider pt-6 first:pt-0 scroll-mt-24"
+    >
+      {children}
+    </h2>
   );
 }
 

@@ -193,12 +193,50 @@ export default function PoliticaPrivacidadePage() {
         <li>Backups regulares com retenção de 30 dias</li>
       </UL>
 
-      <H2>9. Cookies</H2>
+      <H2 id="cookies">9. Cookies e analytics</H2>
       <P>
-        O site marketing (guiaprint3d.com) usa cookies essenciais para
-        funcionamento. Não usamos cookies de tracking de terceiros (Google
-        Analytics, Facebook Pixel) no momento. Se mudarmos isso,
-        atualizaremos esta política e pediremos seu consentimento.
+        Usamos cookies essenciais para o funcionamento do site (sessão,
+        preferências). Além desses, utilizamos o <strong>Google
+        Analytics 4 (GA4)</strong> para entender de forma agregada como os
+        visitantes usam a landing (páginas vistas, cliques em CTAs, etapas
+        do formulário) e melhorar a experiência.
+      </P>
+      <P>
+        O GA4 <strong>só é carregado após o seu consentimento</strong>.
+        Na primeira visita exibimos um banner discreto: enquanto você não
+        clica em “Aceitar”, nenhum dado é enviado ao Google. Não usamos os
+        dados para identificar você individualmente nem os vendemos.
+      </P>
+      <P>
+        <strong>Como recusar ou revogar (opt-out):</strong>
+      </P>
+      <UL>
+        <li>
+          Clique em <strong>“Recusar”</strong> no banner de cookies — o
+          GA4 nunca é carregado
+        </li>
+        <li>
+          Já aceitou e mudou de ideia? Limpe os dados do site no seu
+          navegador (a chave <code className="text-caption font-mono">printstudio_consent</code>{' '}
+          no armazenamento local) e o banner reaparece
+        </li>
+        <li>
+          Use a{' '}
+          <a
+            href="https://tools.google.com/dlpage/gaoptout"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline-offset-2 hover:underline"
+          >
+            extensão oficial de opt-out do Google Analytics
+          </a>{' '}
+          ou o modo anônimo do navegador
+        </li>
+      </UL>
+      <P>
+        Não usamos pixels de redes sociais (Facebook, etc.) nem cookies de
+        publicidade. Se isso mudar, atualizaremos esta política e pediremos
+        novo consentimento.
       </P>
 
       <H2>10. Crianças e adolescentes</H2>

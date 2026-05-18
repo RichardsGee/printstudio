@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { Analytics } from './_components/analytics';
+import { ConsentBanner } from './_components/consent-banner';
 
 /**
  * Layout do route group público — Story 7.7 AC 2.
@@ -19,5 +21,11 @@ export default function PublicLayout({
 }: {
   children: ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <Analytics />
+      <ConsentBanner />
+    </>
+  );
 }
