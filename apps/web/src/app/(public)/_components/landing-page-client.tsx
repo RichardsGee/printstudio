@@ -8,6 +8,7 @@ import { Faq } from './faq';
 import { WaitlistForm } from './waitlist-form';
 import { DemoModal } from './demo-modal';
 import { SiteFooter } from './site-footer';
+import { StickyCta } from './sticky-cta';
 import { trackEvent } from '@/lib/analytics';
 
 /**
@@ -51,6 +52,8 @@ export function LandingPageClient() {
       </main>
 
       <SiteFooter />
+
+      <StickyCta />
 
       <DemoModal open={demoOpen} onOpenChange={setDemoOpen} />
     </>
