@@ -4,6 +4,7 @@ import { Suspense, useCallback, useState } from 'react';
 import { SiteHeader } from './site-header';
 import { Hero } from './hero';
 import { Features } from './features';
+import { Faq } from './faq';
 import { WaitlistForm } from './waitlist-form';
 import { DemoModal } from './demo-modal';
 import { SiteFooter } from './site-footer';
@@ -43,6 +44,7 @@ export function LandingPageClient() {
           onDemoClick={handleDemoClick}
         />
         <Features />
+        <Faq />
         <Suspense fallback={null}>
           <WaitlistForm />
         </Suspense>
