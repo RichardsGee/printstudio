@@ -1,12 +1,20 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// NOTA Story 7.7 — Fase 1: hero usa o HUD placeholder direto.
-// O hero 3D real (RealisticPreview3D em mode="demo" com Benchy .3mf)
-// entra na Fase 6 (AC 29-33), substituindo <HeroVisualPlaceholder/>
-// por <HeroPrintPreview/> com dynamic ssr:false (HUD vira skeleton).
+// Story 7.7 AC 31-32 — Three.js fica em chunk lazy separado: o hero 3D
+// real (Benchy .3mf) só carrega no client (ssr:false), com o HUD
+// Mission Control servindo de skeleton durante o load. Bundle inicial
+// da landing NÃO inclui Three.js.
+const HeroPrintPreview = dynamic(
+  () => import('./hero-print-preview').then((m) => m.HeroPrintPreview),
+  {
+    ssr: false,
+    loading: () => <HeroVisualPlaceholder />,
+  },
+);
 
 interface HeroProps {
   onWaitlistClick: () => void;
@@ -70,7 +78,7 @@ export function Hero({ onWaitlistClick, onDemoClick }: HeroProps) {
           </p>
         </div>
 
-        <HeroVisualPlaceholder />
+        <HeroPrintPreview />
       </div>
     </section>
   );
