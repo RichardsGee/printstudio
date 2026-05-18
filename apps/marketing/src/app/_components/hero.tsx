@@ -1,7 +1,16 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+const Hero3DPreview = dynamic(
+  () => import('./hero-3d-preview').then((m) => m.Hero3DPreview),
+  {
+    ssr: false,
+    loading: () => <HeroVisualPlaceholder />,
+  },
+);
 
 interface HeroProps {
   onWaitlistClick: () => void;
@@ -65,7 +74,7 @@ export function Hero({ onWaitlistClick, onDemoClick }: HeroProps) {
           </p>
         </div>
 
-        <HeroVisualPlaceholder />
+        <Hero3DPreview />
       </div>
     </section>
   );
