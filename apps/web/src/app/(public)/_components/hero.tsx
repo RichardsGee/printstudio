@@ -4,8 +4,12 @@ import dynamic from 'next/dynamic';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const Hero3DPreview = dynamic(
-  () => import('./hero-3d-preview').then((m) => m.Hero3DPreview),
+// Story 7.7 AC 31-32 — Three.js fica em chunk lazy separado: o hero 3D
+// real (Benchy .3mf) só carrega no client (ssr:false), com o HUD
+// Mission Control servindo de skeleton durante o load. Bundle inicial
+// da landing NÃO inclui Three.js.
+const HeroPrintPreview = dynamic(
+  () => import('./hero-print-preview').then((m) => m.HeroPrintPreview),
   {
     ssr: false,
     loading: () => <HeroVisualPlaceholder />,
@@ -74,7 +78,7 @@ export function Hero({ onWaitlistClick, onDemoClick }: HeroProps) {
           </p>
         </div>
 
-        <Hero3DPreview />
+        <HeroPrintPreview />
       </div>
     </section>
   );

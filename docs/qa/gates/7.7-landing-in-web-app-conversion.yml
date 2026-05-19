@@ -1,0 +1,78 @@
+storyId: "7.7"
+storyTitle: "Landing pública integrada ao apps/web + melhorias de conversão"
+epic: 7
+reviewer: "@qa (Quinn)"
+date: "2026-05-19"
+branch: "story/7.7-landing-conversion"
+commitsReviewed: "8880123..7a40b68"
+verdict: CONCERNS
+
+summary: >
+  Implementação sólida em 6 fases. Typecheck 8/8 workspaces limpo,
+  build apps/web verde, AC 32 (Three.js lazy) confirmado. 3 deviations
+  documentadas e defensáveis (AC 5 escolha do owner, AC 4 mais seguro
+  que o spec, AC 29 endossado pelo @po). CONCERNS por itens de
+  verificação runtime não evidenciados + tech-debt de binário em git —
+  nenhum bloqueante. Liberado pra @devops push; follow-ups runtime
+  antes do deploy em produção.
+
+qualityChecks:
+  codeReview: PASS
+  unitTests: CONCERNS      # apps/web sem test runner (norma do projeto)
+  acceptanceCriteria: PASS # 33 ACs, 3 deviations documentadas
+  noRegressions: PASS
+  performance: PASS        # / First Load 152kB, three lazy
+  security: PASS           # 1 nota LOW (XFF pré-existente)
+  documentation: PASS
+
+issues:
+  - severity: medium
+    category: code
+    description: >
+      demo-benchy.3mf (3.0 MB) commitado 2x no histórico git
+      (8880123 apps/marketing + 7a40b68 apps/web) ≈ 6 MB permanentes.
+    recommendation: >
+      Avaliar git-LFS ou servir de CDN; remover cópia do apps/marketing
+      se o backup congelado não precisar do hero 3D. Backlog tech-debt.
+  - severity: medium
+    category: tests
+    description: >
+      Validação visual/runtime não executada (hero 3D render, fluxo
+      consent LGPD, wizard 3-step + eventos, sticky CTA mobile,
+      submit→/sucesso). apps/web não tem test runner (consistente com
+      a norma — só apps/api tem vitest).
+    recommendation: >
+      Rodar pnpm --filter @printstudio/web dev e validar manualmente
+      antes do deploy em produção (gate de runtime, não de merge).
+  - severity: medium
+    category: requirements
+    description: >
+      Lighthouse Accessibility >= 95 (Quality Gate da própria story)
+      não foi medido.
+    recommendation: "Rodar Lighthouse na landing antes/no deploy."
+  - severity: low
+    category: security
+    description: >
+      Proxy route repassa x-forwarded-for do client; spoof de IP p/
+      burlar rate-limit é teoricamente possível — porém é comportamento
+      PRÉ-EXISTENTE do endpoint Fastify, não introduzido por esta story.
+    recommendation: >
+      Sem ação obrigatória. Se virar problema, validar XFF no edge
+      (EasyPanel) e/ou rate-limit por fingerprint adicional.
+  - severity: low
+    category: docs
+    description: "Numeração de AC fora de ordem (22 → 29-33 → 23-28)."
+    recommendation: "Editorial — renumerar numa próxima limpeza da story."
+
+deviationsAssessed:
+  - ac: "AC 5"
+    decision: "Proxy route no apps/web (path relativo)"
+    qaView: "APROVADO — escolha explícita do owner; sem SSRF; XFF preservado"
+  - ac: "AC 4"
+    decision: "Middleware intocado (default-allow + guards server-side)"
+    qaView: "APROVADO — mais seguro que o default-deny do spec; sem auth leak"
+  - ac: "AC 29-30"
+    decision: "Benchy standalone; realistic-preview-3d.tsx intocado"
+    qaView: "APROVADO — endossado @po; zero risco de regressão no kiosk"
+
+nextStep: "@devops *push (branch + PR). Follow-ups runtime (#2,#3) antes do deploy prod; #1,#4 → backlog."
