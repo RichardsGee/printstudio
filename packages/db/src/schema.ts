@@ -73,6 +73,13 @@ export const waitlistRoleEnum = pgEnum('waitlist_role', [
   'other',        // educação, comunidade maker
 ]);
 
+// Epic 10 Story 10.1 — Notificações por usuário. Enum extensível:
+// canais futuros (telegram/email) via `ALTER TYPE ... ADD VALUE`
+// (não-destrutivo, Postgres).
+export const notificationChannelTypeEnum = pgEnum('notification_channel_type', [
+  'whatsapp',
+]);
+
 /**
  * Organização — unidade de tenancy no PrintStudio. Cada org tem suas
  * próprias impressoras, jobs, eventos e (futuro) credenciais Bambu cloud.
@@ -505,6 +512,72 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+/**
+ * Epic 10 Story 10.1 — Canais de notificação por usuário.
+ *
+ * Cada linha = um meio de contato (V1: whatsapp) de um usuário, com
+ * verificação opt-in por código (Story 10.3). `destination` é E.164
+ * em texto plano por decisão de design (@data-engineer, Story 10.1):
+ * não é credencial — encriptar quebraria o UNIQUE e forçaria decrypt
+ * em todo dispatch (Story 10.4). NUNCA logar o número cheio (mascarar
+ * na app). `code_hash` guarda só o HASH do código, nunca o cru.
+ */
+export const notificationChannels = pgTable(
+  'notification_channels',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    type: notificationChannelTypeEnum('type').notNull(),
+    destination: text('destination').notNull(),
+    verified: boolean('verified').default(false).notNull(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    codeHash: text('code_hash'),
+    codeExpiresAt: timestamp('code_expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    uqUserTypeDest: unique('uq_notification_channels_user_type_dest').on(
+      t.userId,
+      t.type,
+      t.destination,
+    ),
+  }),
+);
+
+/**
+ * Epic 10 Story 10.1 — Regras de notificação (impressora × eventos).
+ *
+ * `printerId` NULL = "todas as impressoras da org do usuário" — cobre
+ * impressoras adicionadas no futuro sem regra nova. `eventTypes` é
+ * text[] (subset de print_finished | print_failed | hms_critical |
+ * printer_offline); validação do conteúdo fica na app (Zod, Stories
+ * 10.4/10.6), não no schema V1.
+ */
+export const notificationRules = pgTable('notification_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  channelId: uuid('channel_id')
+    .references(() => notificationChannels.id, { onDelete: 'cascade' })
+    .notNull(),
+  printerId: uuid('printer_id').references(() => printers.id, {
+    onDelete: 'cascade',
+  }),
+  eventTypes: text('event_types').array().notNull(),
+  active: boolean('active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type NotificationChannel = typeof notificationChannels.$inferSelect;
+export type NewNotificationChannel = typeof notificationChannels.$inferInsert;
+export type NotificationRule = typeof notificationRules.$inferSelect;
+export type NewNotificationRule = typeof notificationRules.$inferInsert;
 
 export type Printer = typeof printers.$inferSelect;
 export type NewPrinter = typeof printers.$inferInsert;
