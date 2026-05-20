@@ -1,0 +1,70 @@
+storyId: "10.1"
+storyTitle: "Schema de notificações (notification_channels + notification_rules)"
+epic: 10
+reviewer: "@qa (Quinn)"
+date: "2026-05-20"
+branch: "main (10.1 uncommitted)"
+diff: "+73 insertions / 0 deletions (schema.ts only); 0016_notification_schema.sql NEW"
+verdict: PASS
+
+summary: >
+  Schema sólido, puramente aditivo. Padrões do projeto seguidos
+  (0015/adminAuditLog). Decisões do @data-engineer (encriptação plain,
+  índices na migration, sem snapshot drizzle fabricado) bem justificadas
+  com rationale técnico. Typecheck root 8/8 verde. AC 9/9. Aprovado pra
+  commit/push. Migration apply é gate separado de deploy (autorização
+  do Richard pendente, NÃO de merge).
+
+qualityChecks:
+  codeReview: PASS       # DDL limpa, padrões do projeto
+  unitTests: N/A          # packages/db sem test runner (norma)
+  acceptanceCriteria: PASS # 9/9 ACs
+  noRegressions: PASS     # 0 deleções, typecheck 8/8
+  performance: PASS       # 3 índices nos caminhos de query
+  security: PASS          # DDL puro, code_hash, decisão plain justificada
+  documentation: PASS     # Dev Agent Record completo
+
+issues:
+  - severity: low
+    category: schema
+    description: >
+      event_types text[] sem CHECK constraint enforçando os 4 valores
+      válidos. Validação fica na app (Zod) por design V1.
+    recommendation: >
+      Se observar drift, adicionar CHECK em migration posterior.
+      Não-bloqueante.
+  - severity: low
+    category: security
+    description: >
+      destination armazenado plain (E.164). Decisão técnica sólida (não
+      é credencial, encriptar quebra UNIQUE+dispatch), mas auditoria
+      LGPD futura pode reavaliar.
+    recommendation: >
+      Manter como V1. Documentar na política se exposto a auditoria.
+      Considerar column-level encryption (pgcrypto) se compliance exigir.
+  - severity: medium
+    category: deployment
+    description: >
+      Migration 0016 NÃO aplicada. Gate de DEPLOY (não de merge).
+    recommendation: >
+      Aplicar via padrão estabelecido (SQL ad-hoc + INSERT
+      __drizzle_migrations) APENAS após autorização explícita do
+      Richard. Snapshot do schema antes (Dara principle). Incluir como
+      checklist no PR.
+
+decisionsAssessed:
+  - decision: "destination text plano vs AES"
+    chosen: "text plano E.164"
+    qaView: "APROVADO — rationale técnico sólido (UNIQUE + dispatch)"
+  - decision: "índices na migration SQL, não no schema.ts"
+    chosen: "migration SQL"
+    qaView: "APROVADO — consistente com adminAuditLog/onboardingEvents"
+  - decision: "não fabricar snapshot drizzle"
+    chosen: "deixar meta/_journal como está"
+    qaView: "APROVADO — projeto aplica via ad-hoc, fabricar faria mal"
+
+nextStep: >
+  @devops *push 10.1 — commitar (schema.ts + 0016_*.sql + story + epic-10
+  doc + handoffs) numa branch (ex: story/10.1-notification-schema), abrir
+  PR pra main. Migration apply: agendar com autorização do Richard
+  ANTES do deploy em prod.
