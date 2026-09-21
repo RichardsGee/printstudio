@@ -118,7 +118,7 @@ export function WaitlistDetailDrawer({
 
         <div
           data-mc-card
-          className="space-y-2 rounded-md border border-[var(--mc-accent-soft)]/30 p-3 text-small"
+          className="space-y-2 rounded-md border border-mc-accent-soft/30 p-3 text-small"
         >
           <DetailRow label="STATUS" value={row.status} />
           <DetailRow

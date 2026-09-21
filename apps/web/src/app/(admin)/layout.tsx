@@ -24,7 +24,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-dvh flex flex-col">
-      <header className="sticky top-0 z-30 border-b border-[var(--mc-accent-soft)]/30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-30 border-b border-mc-accent-soft/30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container max-w-7xl flex h-14 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="lg:hidden">

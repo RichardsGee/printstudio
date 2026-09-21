@@ -61,6 +61,19 @@ const config: Config = {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
         },
+        // Mission Control (mission-control.css). Em canais pra aceitar
+        // opacidade: `border-mc-accent-soft/30`. Nunca `border-[var(--mc-…)]/30`
+        // — o Tailwind descarta a opacidade sobre var() e não gera CSS.
+        mc: {
+          accent: 'rgb(var(--mc-accent-rgb) / <alpha-value>)',
+          'accent-soft': 'rgb(var(--mc-accent-soft-rgb) / <alpha-value>)',
+          warning: 'rgb(var(--mc-warning-rgb) / <alpha-value>)',
+          danger: 'rgb(var(--mc-danger-rgb) / <alpha-value>)',
+          success: 'rgb(var(--mc-success-rgb) / <alpha-value>)',
+          bg: 'rgb(var(--mc-bg-rgb) / <alpha-value>)',
+          fg: 'rgb(var(--mc-fg-rgb) / <alpha-value>)',
+          'fg-dim': 'rgb(var(--mc-fg-dim-rgb) / <alpha-value>)',
+        },
       },
       fontSize: {
         micro: ['var(--fs-micro)', { lineHeight: '1rem', letterSpacing: '0.05em' }],

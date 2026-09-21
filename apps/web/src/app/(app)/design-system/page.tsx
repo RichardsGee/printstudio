@@ -348,17 +348,17 @@ export default function DesignSystemPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="kiosk-mission demo-mode space-y-3 p-4 bg-[var(--mc-bg)]/50 rounded-md">
+          <div className="kiosk-mission demo-mode space-y-3 p-4 bg-mc-bg/50 rounded-md">
             <div>
-              <SectionLabel className="mb-1 text-[var(--mc-accent)]">PROGRESS · 25%</SectionLabel>
+              <SectionLabel className="mb-1 text-mc-accent">PROGRESS · 25%</SectionLabel>
               <MissionGauge value={25} />
             </div>
             <div>
-              <SectionLabel className="mb-1 text-[var(--mc-accent)]">PROGRESS · 67%</SectionLabel>
+              <SectionLabel className="mb-1 text-mc-accent">PROGRESS · 67%</SectionLabel>
               <MissionGauge value={67} />
             </div>
             <div>
-              <SectionLabel className="mb-1 text-[var(--mc-accent)]">PROGRESS · 100% (10 segmentos)</SectionLabel>
+              <SectionLabel className="mb-1 text-mc-accent">PROGRESS · 100% (10 segmentos)</SectionLabel>
               <MissionGauge value={100} segments={10} />
             </div>
           </div>
@@ -373,17 +373,17 @@ export default function DesignSystemPage() {
         </CardHeader>
         <CardContent>
           <p className="text-small text-muted-foreground mb-3">
-            Cada linha tem nível por cor: <span className="text-[var(--mc-accent)] font-mono">ok (cyan)</span> ·{' '}
-            <span className="text-[var(--mc-warning)] font-mono">warn (amber)</span> ·{' '}
-            <span className="text-[var(--mc-danger)] font-mono">crit (red)</span> ·{' '}
+            Cada linha tem nível por cor: <span className="text-mc-accent font-mono">ok (cyan)</span> ·{' '}
+            <span className="text-mc-warning font-mono">warn (amber)</span> ·{' '}
+            <span className="text-mc-danger font-mono">crit (red)</span> ·{' '}
             <span className="text-muted-foreground font-mono">off (dim)</span>
           </p>
-          <div className="kiosk-mission demo-mode grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-[var(--mc-bg)]/50 rounded-md">
-            <div className="rounded-md border border-[var(--mc-accent-soft)]/40 p-3 bg-black/20">
+          <div className="kiosk-mission demo-mode grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-mc-bg/50 rounded-md">
+            <div className="rounded-md border border-mc-accent-soft/40 p-3 bg-black/20">
               <div className="text-[10px] uppercase text-muted-foreground mb-1.5">imprimindo (níveis ok)</div>
               <SensorPanel state={MOCK_PRINTING} />
             </div>
-            <div className="rounded-md border border-[var(--mc-accent-soft)]/40 p-3 bg-black/20">
+            <div className="rounded-md border border-mc-accent-soft/40 p-3 bg-black/20">
               <div className="text-[10px] uppercase text-muted-foreground mb-1.5">aquecendo (níveis warn)</div>
               <SensorPanel state={MOCK_HEATING} />
             </div>
@@ -401,18 +401,18 @@ export default function DesignSystemPage() {
             <code className="text-caption font-mono">[data-mc-card]::before / ::after</code>.
             Header tem <code className="text-caption font-mono">[data-mc-led]</code> pulsando.
           </p>
-          <div className="kiosk-mission demo-mode p-4 bg-[var(--mc-bg)]/50 rounded-md">
+          <div className="kiosk-mission demo-mode p-4 bg-mc-bg/50 rounded-md">
             <div data-mc-card className="border-2 p-0 max-w-md">
-              <div className="px-3 py-2 flex items-center gap-2 border-b border-[var(--mc-accent-soft)]/30 bg-[var(--mc-accent)]/8">
-                <span data-mc-led className="text-[var(--mc-accent)]" aria-hidden />
-                <span data-mc-label className="text-xs font-semibold uppercase text-[var(--mc-accent)]">
+              <div className="px-3 py-2 flex items-center gap-2 border-b border-mc-accent-soft/30 bg-mc-accent/[0.08]">
+                <span data-mc-led className="text-mc-accent" aria-hidden />
+                <span data-mc-label className="text-xs font-semibold uppercase text-mc-accent">
                   [ACTIVE]
                 </span>
                 <span data-mc-id className="text-[10px] text-muted-foreground">{'// STN-3F0C'}</span>
                 <span className="ml-auto text-xs font-semibold">A1 PRINCIPAL</span>
               </div>
               <div className="p-4 space-y-2">
-                <SectionLabel className="text-[var(--mc-accent)]">CONTEÚDO</SectionLabel>
+                <SectionLabel className="text-mc-accent">CONTEÚDO</SectionLabel>
                 <div className="text-small text-muted-foreground">
                   Aqui dentro vai o resto do conteúdo do card. Brackets aparecem nos 4 cantos.
                 </div>
@@ -427,12 +427,12 @@ export default function DesignSystemPage() {
           <CardTitle className="text-body">Banner · Mission Control header</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="kiosk-mission demo-mode p-4 bg-[var(--mc-bg)]/50 rounded-md">
+          <div className="kiosk-mission demo-mode p-4 bg-mc-bg/50 rounded-md">
             <div
               data-mc-banner
               className="flex items-center justify-between gap-4 px-5 py-3 border-2 relative"
             >
-              <div data-mc-id className="absolute -top-2 left-3 px-2 text-[10px] uppercase tracking-widest text-[var(--mc-accent)] bg-[var(--mc-bg)]">
+              <div data-mc-id className="absolute -top-2 left-3 px-2 text-[10px] uppercase tracking-widest text-mc-accent bg-mc-bg">
                 ◢ MISSION CONTROL · STATION TEL-RJ-01
               </div>
               <div className="flex items-center gap-3 min-w-0">
@@ -463,9 +463,9 @@ export default function DesignSystemPage() {
             técnico (<code className="text-caption font-mono">bambu-a1-blueprint.png</code>) com filtro CSS
             de cyan tint pra harmonizar com o tema.
           </p>
-          <div className="kiosk-mission demo-mode grid grid-cols-2 gap-3 p-4 bg-[var(--mc-bg)]/50 rounded-md">
-            <div className="aspect-square border border-[var(--mc-accent-soft)]/40 rounded-md overflow-hidden flex items-center justify-center bg-black/30 relative">
-              <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-[var(--mc-accent-soft)] px-1.5 py-0.5">
+          <div className="kiosk-mission demo-mode grid grid-cols-2 gap-3 p-4 bg-mc-bg/50 rounded-md">
+            <div className="aspect-square border border-mc-accent-soft/40 rounded-md overflow-hidden flex items-center justify-center bg-black/30 relative">
+              <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-mc-accent-soft px-1.5 py-0.5">
                 <ImageIcon className="h-3 w-3" />
                 <span data-mc-label className="text-[10px] uppercase">REAL</span>
               </span>
@@ -476,8 +476,8 @@ export default function DesignSystemPage() {
                 className="max-h-full max-w-full object-contain p-3"
               />
             </div>
-            <div className="aspect-square border border-[var(--mc-accent-soft)]/40 rounded-md overflow-hidden flex items-center justify-center bg-black/30 relative">
-              <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-[var(--mc-accent-soft)] px-1.5 py-0.5">
+            <div className="aspect-square border border-mc-accent-soft/40 rounded-md overflow-hidden flex items-center justify-center bg-black/30 relative">
+              <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-mc-accent-soft px-1.5 py-0.5">
                 <PencilRuler className="h-3 w-3" />
                 <span data-mc-label className="text-[10px] uppercase">TECH</span>
               </span>
@@ -581,9 +581,9 @@ function McStatus({
     <span
       className={cn(
         'inline-block px-2 py-0.5 border',
-        tone === 'ok' && 'text-[var(--mc-accent)] border-[var(--mc-accent)]/50',
-        tone === 'warn' && 'text-[var(--mc-warning)] border-[var(--mc-warning)]/50',
-        tone === 'crit' && 'text-[var(--mc-danger)] border-[var(--mc-danger)]/50',
+        tone === 'ok' && 'text-mc-accent border-mc-accent/50',
+        tone === 'warn' && 'text-mc-warning border-mc-warning/50',
+        tone === 'crit' && 'text-mc-danger border-mc-danger/50',
         tone === 'dim' && 'text-muted-foreground border-border/60',
       )}
     >
