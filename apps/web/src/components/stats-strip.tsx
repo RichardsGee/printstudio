@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, Clock3, Printer as PrinterIcon, Percent } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-import { getApiBase } from '@/lib/bridge-url';
+import { apiFetch } from '@/lib/realtime-token';
 
 interface StatsResponse {
   totalJobs: number;
@@ -31,10 +31,7 @@ export function StatsStrip({ printerId }: { printerId?: string }) {
 
   useEffect(() => {
     let alive = true;
-    const url = printerId
-      ? `${getApiBase()}/api/stats?printerId=${printerId}`
-      : `${getApiBase()}/api/stats`;
-    fetch(url)
+    apiFetch(printerId ? `/api/stats?printerId=${printerId}` : '/api/stats')
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: StatsResponse) => {
         if (alive) {

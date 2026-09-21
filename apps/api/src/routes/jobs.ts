@@ -4,6 +4,7 @@ import { and, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { printJobs } from '@printstudio/db';
 import { db } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireRealtimeToken } from '../middleware/realtime-auth.js';
 
 const QuerySchema = z.object({
   printerId: z.string().uuid().optional(),
@@ -38,15 +39,20 @@ export async function registerJobRoutes(app: FastifyInstance): Promise<void> {
    * Retorna contagens, taxa de sucesso, tempo total e histograma por
    * hora do dia (pra detectar horários de pico de falhas).
    */
-  app.get('/api/stats', async (req, reply) => {
+  app.get('/api/stats', { preHandler: requireRealtimeToken }, async (req, reply) => {
     const q = z
       .object({ printerId: z.string().uuid().optional() })
       .safeParse(req.query);
     if (!q.success) return reply.code(400).send({ error: 'invalid query' });
 
+    // Sempre escopado pela organização do token — sem printerId, soma só
+    // as impressoras dela, nunca a base inteira. A posse vem de `printers`:
+    // o organization_id de print_jobs não é gravado e fica no default.
+    const orgId = req.realtime!.org;
     const pidFilter = q.data.printerId
-      ? sql`WHERE printer_id = ${q.data.printerId}`
-      : sql``;
+      ? sql`WHERE printer_id = ${q.data.printerId}
+            AND printer_id IN (SELECT id FROM printers WHERE organization_id = ${orgId})`
+      : sql`WHERE printer_id IN (SELECT id FROM printers WHERE organization_id = ${orgId})`;
 
     // Agrega tudo numa query só pra manter leve.
     const rows = await db.execute<{
