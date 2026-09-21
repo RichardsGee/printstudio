@@ -1,5 +1,4 @@
 import type { PrinterState, HmsError } from '@printstudio/shared';
-import { lookupHmsCode } from '@printstudio/shared';
 import { logger } from '../logger.js';
 import { sendTelegramMessage } from './telegram.js';
 
@@ -36,10 +35,7 @@ function hmsToText(errors: HmsError[]): string {
   if (errors.length === 0) return '';
   const critical = errors.filter((e) => e.severity === 'fatal' || e.severity === 'error');
   return critical
-    .map((e) => {
-      const info = lookupHmsCode(e.code);
-      return `- *${info?.title ?? e.code}* (${e.severity})`;
-    })
+    .map((e) => `- *${e.message ?? e.code}* (${e.severity}${e.message ? ` · ${e.code}` : ''})`)
     .join('\n');
 }
 

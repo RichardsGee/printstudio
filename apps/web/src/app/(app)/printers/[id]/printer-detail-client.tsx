@@ -9,6 +9,7 @@ import {
   Flame,
   Wind,
   HardDrive,
+  AlertOctagon,
 } from 'lucide-react';
 import {
   LineChart,
@@ -18,9 +19,15 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  Legend,
 } from 'recharts';
 import { toast } from 'sonner';
-import type { CommandAction, PrinterEvent } from '@printstudio/shared';
+import {
+  formatPrintErrorCode,
+  printerCapabilities,
+  type CommandAction,
+  type PrinterEvent,
+} from '@printstudio/shared';
 import { useConnection } from '@/lib/connection';
 import { WsClient } from '@/lib/ws-client';
 import { usePrinterStore } from '@/lib/store';
@@ -47,6 +54,8 @@ import { cn, formatDateTime, formatDuration, formatEtaClock } from '@/lib/utils'
 interface Props {
   printerId: string;
   name: string;
+  /** `printers.model` (dev_product_name) — decide imagem, AMS e sensores. */
+  model: string;
 }
 
 interface TempPoint {
@@ -57,9 +66,13 @@ interface TempPoint {
 }
 
 const TEMP_WINDOW_HOURS = 24;
+/** Sem atualização por mais que isto, a tela avisa que o dado pode estar velho. */
+const STALE_AFTER_SEC = 60;
 import { getApiBase } from '@/lib/bridge-url';
 
-export function PrinterDetailClient({ printerId, name }: Props) {
+export function PrinterDetailClient({ printerId, name, model }: Props) {
+  const caps = printerCapabilities(model);
+  const isA1Family = model.toUpperCase().startsWith('A1');
   const { wsUrl, detecting } = useConnection();
   const state = usePrinterStore((s) => s.states[printerId]);
   const setState = usePrinterStore((s) => s.setState);
@@ -70,6 +83,12 @@ export function PrinterDetailClient({ printerId, name }: Props) {
   // remontar e re-buscar o mesh, sem reload da página (preserva logs
   // do DevTools).
   const [cachedVersion, setCachedVersion] = useState(0);
+  // Relógio pra idade do dado — re-renderiza a cada 5s.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(id);
+  }, []);
   const clientRef = useRef<WsClient | null>(null);
 
   // Carrega histórico de 24h do endpoint na montagem, e depois vai
@@ -163,6 +182,9 @@ export function PrinterDetailClient({ printerId, name }: Props) {
       : null);
 
   const progress = state?.progressPct ?? 0;
+  const ageSec = state?.updatedAt
+    ? Math.max(0, Math.round((now - new Date(state.updatedAt).getTime()) / 1000))
+    : null;
 
   return (
     <div className="space-y-4">
@@ -196,6 +218,19 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           {state?.stateChangeReason ? (
             <div className="text-small text-muted-foreground">
               {state.stateChangeReason}
+            </div>
+          ) : null}
+          {ageSec != null ? (
+            <div
+              data-mc-num
+              className={cn(
+                'text-caption uppercase tracking-wider',
+                ageSec > STALE_AFTER_SEC ? 'text-warning' : 'text-muted-foreground',
+              )}
+            >
+              {ageSec > STALE_AFTER_SEC
+                ? `⚠ sem dados há ${formatAge(ageSec)}`
+                : `atualizado há ${ageSec}s`}
             </div>
           ) : null}
         </div>
@@ -302,6 +337,21 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 )}
               </div>
 
+              {state?.printErrorCode != null ? (
+                <div className="flex gap-2 border border-danger/40 bg-danger/10 px-2.5 py-2 text-danger">
+                  <AlertOctagon className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <div data-mc-label className="text-caption uppercase tracking-wider">
+                      Erro de impressão{' '}
+                      <span data-mc-id>{formatPrintErrorCode(state.printErrorCode)}</span>
+                    </div>
+                    <div className="text-small text-foreground">
+                      {state.printErrorMessage ?? 'Código sem descrição na base Bambu.'}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Progresso + Camadas (stacked, mesma largura) */}
               <div className="space-y-3">
                 <ProgressMetric
@@ -397,12 +447,14 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                 value={formatTempWithTarget(state?.bedTemp, state?.bedTargetTemp)}
                 tone="warn"
               />
-              <StatRow
-                icon={Wind}
-                label="Câmara"
-                value={formatTempOnly(state?.chamberTemp)}
-                tone="muted"
-              />
+              {caps.chamberTemp ? (
+                <StatRow
+                  icon={Wind}
+                  label="Câmara"
+                  value={formatTempOnly(state?.chamberTemp)}
+                  tone="muted"
+                />
+              ) : null}
             </div>
 
             <div className="space-y-1 pt-3 border-t border-[var(--mc-accent-soft)]/30">
@@ -414,8 +466,8 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               </div>
               <FansDisplay
                 part={state?.fanPartCoolingPct ?? null}
-                aux={state?.fanAuxPct ?? null}
-                chamber={state?.fanChamberPct ?? null}
+                aux={caps.auxFan ? (state?.fanAuxPct ?? null) : undefined}
+                chamber={caps.chamberFan ? (state?.fanChamberPct ?? null) : undefined}
                 heatbreak={state?.fanHeatbreakPct ?? null}
               />
             </div>
@@ -442,25 +494,32 @@ export function PrinterDetailClient({ printerId, name }: Props) {
           </CardHeader>
           <CardContent className="space-y-3 pb-3 flex-1 flex flex-col">
             <div className="relative aspect-[3/2] bg-gradient-to-br from-muted/30 to-background border border-[var(--mc-accent-soft)]/30 overflow-hidden flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/bambu-a1.png"
-                alt="Bambu Lab A1"
-                draggable={false}
-                className="max-h-full max-w-full object-contain p-2"
-              />
+              {isA1Family ? (
+                // Só temos arte da A1; outro modelo mostra o nome em vez da foto errada.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/images/bambu-a1.png"
+                  alt={`Bambu Lab ${model}`}
+                  draggable={false}
+                  className="max-h-full max-w-full object-contain p-2"
+                />
+              ) : (
+                <div data-mc-id className="text-heading uppercase tracking-wider text-muted-foreground">
+                  {model}
+                </div>
+              )}
               <div
                 data-mc-label
                 className="absolute top-1.5 left-2 text-caption uppercase tracking-wider text-muted-foreground"
               >
-                A1 + AMS
+                {model} + AMS
               </div>
             </div>
 
             <AmsDisplay
               slots={state?.amsSlots ?? []}
               units={state?.amsUnits ?? []}
-              model="A1"
+              model={model}
               bare
             />
 
@@ -523,14 +582,23 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                   isAnimationActive={false}
                   name="Mesa"
                 />
-                <Line
-                  type="monotone"
-                  dataKey="chamber"
-                  stroke="#a78bfa"
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                  name="Câmara"
+                {caps.chamberTemp ? (
+                  <Line
+                    type="monotone"
+                    dataKey="chamber"
+                    stroke="#a78bfa"
+                    strokeWidth={1.5}
+                    dot={false}
+                    isAnimationActive={false}
+                    name="Câmara"
+                  />
+                ) : null}
+                <Legend
+                  verticalAlign="top"
+                  align="right"
+                  height={20}
+                  iconType="plainline"
+                  wrapperStyle={{ fontSize: 11 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -694,4 +762,11 @@ function formatTempWithTarget(
 function formatTempOnly(current: number | null | undefined): string {
   if (current == null) return '—';
   return `${current.toFixed(1)}°C`;
+}
+
+/** Idade curta pro aviso de dado velho: `75s` → `1 min`, `7200s` → `2h`. */
+function formatAge(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)} min`;
+  return `${Math.floor(sec / 3600)}h`;
 }

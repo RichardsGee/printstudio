@@ -6,6 +6,7 @@
 
 import type { PrinterState, PrinterStatus, AmsSlot, AmsUnit, HmsError, SpeedMode } from '@printstudio/shared';
 import type { BambuReport, BambuHmsItem, BambuAms } from './types.js';
+import { HMS_MESSAGES_PT_BR, PRINT_ERROR_MESSAGES_PT_BR } from './hms-messages.pt-BR.js';
 
 const GCODE_STATE_MAP: Record<string, PrinterStatus> = {
   IDLE: 'IDLE',
@@ -22,17 +23,37 @@ export function mapGcodeState(state?: string): PrinterStatus {
   return GCODE_STATE_MAP[state.toUpperCase()] ?? 'UNKNOWN';
 }
 
+const hex = (n: number, digits: number) =>
+  (n >>> 0).toString(16).toUpperCase().padStart(digits, '0');
+
+// Severidade HMS vem de `code >> 16` (1 fatal, 2 sério, 3 comum, 4 info) —
+// mesma regra do ha-bambulab (pybambu/utils.py `get_HMS_severity`).
+const HMS_SEVERITY: Record<number, HmsError['severity']> = {
+  1: 'fatal',
+  2: 'error',
+  3: 'warning',
+  4: 'info',
+};
+
 /**
- * HMS codes are two 32-bit ints (attr + code). Severity is encoded in the top
- * bits of `attr`. See OpenBambuAPI mqtt.md for the encoding details.
+ * HMS = dois inteiros de 32 bits (`attr`, `code`). O código oficial é o
+ * hex dos dois, em 4 grupos: `HMS_AAAA_AAAA_CCCC_CCCC` (o `ecode` da base
+ * Bambu é o mesmo sem separadores). A mensagem vem da base oficial.
  */
 export function parseHmsError(item: BambuHmsItem): HmsError | null {
   if (item.code === undefined || item.attr === undefined) return null;
-  const severityBits = (item.attr >> 16) & 0xf;
-  const severity: HmsError['severity'] =
-    severityBits >= 0xc ? 'fatal' : severityBits >= 0x8 ? 'error' : severityBits >= 0x4 ? 'warning' : 'info';
-  const code = `HMS_${item.attr.toString(16).toUpperCase()}_${item.code.toString(16).toUpperCase()}`;
-  return { code, severity };
+  const a = hex(item.attr, 8);
+  const c = hex(item.code, 8);
+  const code = `HMS_${a.slice(0, 4)}_${a.slice(4)}_${c.slice(0, 4)}_${c.slice(4)}`;
+  const severity = HMS_SEVERITY[(item.code >>> 16) & 0xffff] ?? 'warning';
+  const message = HMS_MESSAGES_PT_BR[a + c];
+  return message ? { code, severity, message } : { code, severity };
+}
+
+/** Texto oficial de um `print_error` (8 hex), ou null se desconhecido. */
+export function printErrorMessage(code: number | null | undefined): string | null {
+  if (code == null || code === 0) return null;
+  return PRINT_ERROR_MESSAGES_PT_BR[hex(code, 8)] ?? null;
 }
 
 /**
@@ -245,6 +266,20 @@ const STG_CUR_MAP: Record<number, string> = {
   [-1]: null as unknown as string,
 };
 
+/** Etapas que só existem antes da primeira camada (rótulos de STG_CUR_MAP). */
+const PREP_ONLY_STAGES = new Set([
+  'Nivelando mesa',
+  'Pré-aquecendo mesa',
+  'Varrendo XY',
+  'Calibrando extrusão',
+  'Scanning da mesa',
+  'Identificando placa',
+  'Calibrando Micro Lidar',
+  'Homing',
+  'Calibrando fluxo de extrusão',
+  'Inspecionando primeira camada',
+]);
+
 export function mapStgCur(stgCur?: number): string | null {
   if (stgCur === undefined || stgCur === null) return null;
   return STG_CUR_MAP[stgCur] ?? null;
@@ -278,10 +313,21 @@ export function applyReport(
   // Em status terminais (FINISH/IDLE/FAILED), suprime o stage antigo
   // — evita mostrar "Concluído" + "Imprimindo" simultaneamente quando
   // a Bambu demora um ciclo pra atualizar.
+  // Etapa de preparação depois da 1ª camada é resíduo: o `mc_print_stage`
+  // fica preso em "Nivelando mesa" e a tela mostrava isso na camada 27/249.
+  const layer = print.layer_num ?? previous.currentLayer;
   const stage =
     status === 'FINISH' || status === 'IDLE' || status === 'FAILED' || status === 'OFFLINE'
       ? null
-      : rawStage;
+      : rawStage && layer != null && layer >= 2 && PREP_ONLY_STAGES.has(rawStage)
+        ? null
+        : rawStage;
+  const printErrorCode =
+    print.print_error !== undefined && print.print_error !== 0
+      ? print.print_error
+      : print.print_error === 0
+        ? null
+        : previous.printErrorCode;
   const nextActiveSlot =
     print.ams?.tray_now !== undefined || print.ams?.tray_tar !== undefined
       ? parseActiveSlot(print.ams) ?? previous.activeSlotIndex
@@ -342,12 +388,8 @@ export function applyReport(
     isFromSdCard: print.sdcard ?? previous.isFromSdCard,
     lifecycle: print.lifecycle ?? previous.lifecycle,
     printType: print.print_type ?? previous.printType,
-    printErrorCode:
-      print.print_error !== undefined && print.print_error !== 0
-        ? print.print_error
-        : print.print_error === 0
-          ? null
-          : previous.printErrorCode,
+    printErrorCode,
+    printErrorMessage: printErrorMessage(printErrorCode),
     stateChangeReason: print.gcode_state_change_reason ?? previous.stateChangeReason,
     updatedAt: new Date().toISOString(),
   };
@@ -376,6 +418,7 @@ export function emptyState(printerId: string): PrinterState {
     lifecycle: null,
     printType: null,
     printErrorCode: null,
+    printErrorMessage: null,
     stateChangeReason: null,
     activeSlotIndex: null,
     speedMode: null,

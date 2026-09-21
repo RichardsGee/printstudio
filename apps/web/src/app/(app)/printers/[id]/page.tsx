@@ -26,5 +26,5 @@ export default async function PrinterDetailPage({
   const printer = await loadPrinter(id, orgId);
   if (!printer) notFound();
 
-  return <PrinterDetailClient printerId={printer.id} name={printer.name} />;
+  return <PrinterDetailClient printerId={printer.id} name={printer.name} model={printer.model} />;
 }

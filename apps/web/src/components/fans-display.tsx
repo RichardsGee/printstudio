@@ -3,24 +3,29 @@
 import { Fan } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/** `undefined` = o modelo não tem essa ventoinha (não renderiza); `null` = sem leitura. */
 interface Props {
   part: number | null;
-  aux: number | null;
-  chamber: number | null;
+  aux?: number | null;
+  chamber?: number | null;
   heatbreak?: number | null;
   className?: string;
 }
 
+const COLS = ['grid-cols-1', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'];
+
 export function FansDisplay({ part, aux, chamber, heatbreak, className }: Props) {
-  const cols = heatbreak !== null && heatbreak !== undefined ? 'grid-cols-4' : 'grid-cols-3';
+  const fans: { label: string; percent: number | null }[] = [{ label: 'Peça', percent: part }];
+  if (aux !== undefined) fans.push({ label: 'Auxiliar', percent: aux });
+  if (chamber !== undefined) fans.push({ label: 'Câmara', percent: chamber });
+  if (heatbreak !== null && heatbreak !== undefined) {
+    fans.push({ label: 'Heatbreak', percent: heatbreak });
+  }
   return (
-    <div className={cn('grid gap-2 text-xs', cols, className)}>
-      <FanItem label="Peça" percent={part} />
-      <FanItem label="Auxiliar" percent={aux} />
-      <FanItem label="Câmara" percent={chamber} />
-      {heatbreak !== null && heatbreak !== undefined ? (
-        <FanItem label="Heatbreak" percent={heatbreak} />
-      ) : null}
+    <div className={cn('grid gap-2 text-xs', COLS[fans.length], className)}>
+      {fans.map((f) => (
+        <FanItem key={f.label} label={f.label} percent={f.percent} />
+      ))}
     </div>
   );
 }

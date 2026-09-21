@@ -2,7 +2,6 @@
 
 import { AlertTriangle, AlertCircle, AlertOctagon, Info } from 'lucide-react';
 import type { HmsError } from '@printstudio/shared';
-import { lookupHmsCode } from '@printstudio/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -52,7 +51,6 @@ export function HmsErrorsCard({ errors }: { errors: HmsError[] }) {
       <CardContent>
         <ul className="space-y-2">
           {sorted.map((err, i) => {
-            const info = lookupHmsCode(err.code);
             const cfg = SEVERITY_CONFIG[err.severity];
             const Icon = cfg.icon;
             return (
@@ -64,17 +62,12 @@ export function HmsErrorsCard({ errors }: { errors: HmsError[] }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">
-                      {info?.title ?? err.message ?? 'Erro desconhecido'}
+                      {err.message ?? 'Erro sem descrição na base Bambu'}
                     </span>
                     <span className="text-[10px] font-mono text-muted-foreground">
                       {err.code}
                     </span>
                   </div>
-                  {info?.hint ? (
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {info.hint}
-                    </div>
-                  ) : null}
                 </div>
               </li>
             );

@@ -5,3 +5,5 @@ build
 coverage
 pnpm-lock.yaml
 *.log
+# gerado por scripts/update-hms-messages.mjs
+packages/bambu-protocol/src/hms-messages.pt-BR.ts
