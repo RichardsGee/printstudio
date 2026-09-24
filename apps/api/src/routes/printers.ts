@@ -5,6 +5,7 @@ import { organizationMembers, printers, printerState, temperatureSamples } from 
 import { db } from '../db.js';
 import { logger } from '../logger.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { filterOrgPrinterIds, requireRealtimeToken } from '../middleware/realtime-auth.js';
 import { canAddPrinter } from '../services/plan-limits.js';
 
 async function resolveUserOrganizationId(userId: string): Promise<string | null> {
@@ -115,10 +116,11 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
    * Histórico de temperaturas com time-bucketing SQL. Retorna no máximo
    * ~300 pontos mesmo pra janelas longas, evitando payload pesado.
    */
-  // Sem auth gate no MVP — consistente com /ws/client, e o LAN
-  // bridge é o único que popula esses dados.
+  // Chamada direto pelo browser: autentica pelo token do web e só lê
+  // impressora da organização do token.
   app.get(
     '/api/printers/:id/temperatures',
+    { preHandler: requireRealtimeToken },
     async (req, reply) => {
       const parse = IdParamSchema.safeParse(req.params);
       if (!parse.success) return reply.code(400).send({ error: 'invalid id' });
@@ -127,6 +129,11 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
         .object({ hours: z.coerce.number().int().min(1).max(168).default(24) })
         .safeParse(req.query);
       if (!q.success) return reply.code(400).send({ error: 'invalid query' });
+
+      // Posse pela tabela printers: o organization_id de temperature_samples
+      // não é gravado pelo bridge-relay e fica no default.
+      const [owned] = await filterOrgPrinterIds(req.realtime!.org, [parse.data.id]);
+      if (!owned) return reply.code(404).send({ error: 'not found' });
 
       const hoursBack = q.data.hours;
       const since = new Date(Date.now() - hoursBack * 3_600_000);

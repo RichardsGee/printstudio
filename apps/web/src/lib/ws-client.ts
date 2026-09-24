@@ -6,6 +6,7 @@ import {
   type ClientOutboundMessage,
   type CommandAction,
 } from '@printstudio/shared';
+import { getRealtimeToken } from './realtime-token';
 
 type Listener = (msg: ClientInboundMessage) => void;
 
@@ -25,13 +26,25 @@ export class WsClient {
 
   connect() {
     this.closedByUser = false;
-    this.open();
+    void this.open();
   }
 
-  private open() {
+  private async open() {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) return;
 
-    const socket = new WebSocket(this.url);
+    // A API exige o token na query (browser não manda header no upgrade).
+    // Buscado a cada (re)conexão — o cache em getRealtimeToken evita
+    // requisição à toa e renova perto de expirar.
+    const token = await getRealtimeToken();
+    if (this.closedByUser) return;
+    if (!token) {
+      this.scheduleReconnect();
+      return;
+    }
+    const url = new URL(this.url);
+    url.searchParams.set('token', token);
+
+    const socket = new WebSocket(url.toString());
     this.socket = socket;
 
     socket.addEventListener('open', () => {
@@ -74,7 +87,7 @@ export class WsClient {
     this.reconnectAttempts += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.open();
+      void this.open();
     }, delay);
   }
 

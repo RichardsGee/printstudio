@@ -8,6 +8,7 @@ export * from './waitlist.js';
 export * from './auth.js';
 export * from './onboarding.js';
 export * from './plans.js';
+export * from './realtime-token.js';
 
 export const APP_NAME = 'PrintStudio';
 export const DEFAULT_BRIDGE_PORT = 8080;
