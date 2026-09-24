@@ -79,6 +79,9 @@ export const PrinterStateSchema = z.object({
   lifecycle: z.string().nullable(),                      // booting / online / ready
   printType: z.string().nullable(),                      // local | cloud | sd
   printErrorCode: z.number().nullable(),                 // print_error code
+  // Texto oficial Bambu do print_error (resolvido no worker; não persiste no
+  // banco — o snapshot inicial vem sem ele e o próximo push do worker traz).
+  printErrorMessage: z.string().nullable().optional(),
   stateChangeReason: z.string().nullable(),              // motivo da última transição
   /** Peso total estimado do filamento pro job atual (g). Extraído
    *  do .3mf via layers metadata. Usado pra persistir em print_jobs
@@ -105,3 +108,31 @@ export const PrinterConfigSchema = z.object({
   model: z.literal('A1').default('A1'),
 });
 export type PrinterConfig = z.infer<typeof PrinterConfigSchema>;
+
+/** `print_error` formatado como a Bambu mostra no app: `0300_400C`. */
+export function formatPrintErrorCode(code: number): string {
+  const h = (code >>> 0).toString(16).toUpperCase().padStart(8, '0');
+  return `${h.slice(0, 4)}_${h.slice(4)}`;
+}
+
+/**
+ * Sensores que o modelo tem de fato. A firmware manda os campos mesmo sem
+ * o hardware (a A1 reporta câmara 5 °C e ventoinha auxiliar 60 %), então a
+ * UI decide pelo modelo — `printers.model`, vindo do `dev_product_name`.
+ * Modelo desconhecido mostra tudo: melhor um dado a mais do que esconder
+ * o que a gente não sabe interpretar.
+ */
+export interface PrinterCapabilities {
+  chamberTemp: boolean;
+  auxFan: boolean;
+  chamberFan: boolean;
+  door: boolean;
+}
+
+export function printerCapabilities(model: string | null | undefined): PrinterCapabilities {
+  const m = (model ?? '').toUpperCase().replace(/[\s_-]+/g, '');
+  if (m.startsWith('A1')) return { chamberTemp: false, auxFan: false, chamberFan: false, door: false };
+  if (m === 'P1P') return { chamberTemp: false, auxFan: false, chamberFan: false, door: false };
+  if (m === 'P1S') return { chamberTemp: false, auxFan: true, chamberFan: true, door: true };
+  return { chamberTemp: true, auxFan: true, chamberFan: true, door: true };
+}

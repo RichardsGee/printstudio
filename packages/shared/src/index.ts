@@ -1,7 +1,6 @@
 export * from './printer.js';
 export * from './events.js';
 export * from './ws.js';
-export * from './hms-codes.js';
 export * from './bambu-cloud.js';
 export * from './cached-model.js';
 export * from './waitlist.js';
