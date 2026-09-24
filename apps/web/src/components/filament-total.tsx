@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-import { getApiBase } from '@/lib/bridge-url';
+import { apiFetch } from '@/lib/realtime-token';
 
 interface Props {
   printerId: string;
@@ -28,7 +28,7 @@ export function FilamentTotal({ printerId, refreshKey, className }: Props) {
 
   useEffect(() => {
     let alive = true;
-    fetch(`${getApiBase()}/api/stats?printerId=${printerId}`, { credentials: 'include' })
+    apiFetch(`/api/stats?printerId=${printerId}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
         if (!alive) return;

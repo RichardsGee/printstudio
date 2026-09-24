@@ -186,7 +186,7 @@ export function KioskPrinterCard({ printerId, name, state }: Props) {
                   window.localStorage.setItem('kiosk-printer-sketch', next ? '1' : '0');
                 }
               }}
-              className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-[var(--mc-accent-soft)] px-1.5 py-0.5 text-foreground hover:bg-background transition-colors"
+              className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-sm border border-mc-accent-soft px-1.5 py-0.5 text-foreground hover:bg-background transition-colors"
               aria-label={sketchMode ? 'Ver imagem real' : 'Ver sketch técnico'}
               title={sketchMode ? 'IMAGE / REAL' : 'SKETCH / TECH'}
             >

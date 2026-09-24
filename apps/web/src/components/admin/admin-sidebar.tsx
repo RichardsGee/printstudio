@@ -69,7 +69,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
               'flex items-center justify-between gap-3 rounded-md border-l-2 px-3 py-2 text-small transition-colors',
               active
                 ? 'border-primary bg-primary/10 text-foreground'
-                : 'border-transparent text-muted-foreground hover:border-[var(--mc-accent-soft)]/40 hover:bg-card/40 hover:text-foreground',
+                : 'border-transparent text-muted-foreground hover:border-mc-accent-soft/40 hover:bg-card/40 hover:text-foreground',
             )}
           >
             <span className="flex items-center gap-3 uppercase tracking-wider">

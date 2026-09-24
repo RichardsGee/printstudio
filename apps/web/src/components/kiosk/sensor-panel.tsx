@@ -89,7 +89,7 @@ export function SensorPanel({ state, className }: Props) {
     >
       <div
         data-mc-id
-        className="text-[10px] uppercase text-[var(--mc-accent)] opacity-70"
+        className="text-[10px] uppercase text-mc-accent opacity-70"
       >
         ◢ TLM // SENSORS
       </div>
@@ -141,7 +141,7 @@ function SegmentedBar({
   return (
     <div
       className={cn(
-        'flex h-2 gap-px border border-[var(--mc-accent-soft)] p-px bg-black/40',
+        'flex h-2 gap-px border border-mc-accent-soft p-px bg-black/40',
         className,
       )}
     >
@@ -150,7 +150,7 @@ function SegmentedBar({
           key={i}
           className={cn(
             'flex-1',
-            i < lit ? LEVEL_FILL[level] : 'bg-[var(--mc-accent)]/10',
+            i < lit ? LEVEL_FILL[level] : 'bg-mc-accent/10',
           )}
           style={i < lit ? { boxShadow: 'inset 0 0 1px rgba(255,255,255,0.4)' } : undefined}
         />
@@ -168,15 +168,15 @@ function tempLevel(current: number, target: number): Level {
 }
 
 const LEVEL_FILL: Record<Level, string> = {
-  ok: 'bg-[var(--mc-accent)] shadow-[0_0_3px_var(--mc-accent)]',
-  warn: 'bg-[var(--mc-warning)] shadow-[0_0_3px_var(--mc-warning)]',
-  crit: 'bg-[var(--mc-danger)] shadow-[0_0_3px_var(--mc-danger)]',
-  off: 'bg-[var(--mc-fg-dim)]',
+  ok: 'bg-mc-accent shadow-[0_0_3px_var(--mc-accent)]',
+  warn: 'bg-mc-warning shadow-[0_0_3px_var(--mc-warning)]',
+  crit: 'bg-mc-danger shadow-[0_0_3px_var(--mc-danger)]',
+  off: 'bg-mc-fg-dim',
 };
 
 const LEVEL_TEXT: Record<Level, string> = {
-  ok: 'text-[var(--mc-accent)]',
-  warn: 'text-[var(--mc-warning)]',
-  crit: 'text-[var(--mc-danger)]',
+  ok: 'text-mc-accent',
+  warn: 'text-mc-warning',
+  crit: 'text-mc-danger',
   off: 'text-muted-foreground',
 };

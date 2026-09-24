@@ -102,7 +102,7 @@ export function WaitlistFilters({
     (searchParams.get('q') ?? '').length > 0;
 
   return (
-    <div className="space-y-3 rounded-lg border border-[var(--mc-accent-soft)]/30 bg-card/40 p-4">
+    <div className="space-y-3 rounded-lg border border-mc-accent-soft/30 bg-card/40 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Input
           type="search"
@@ -199,7 +199,7 @@ function FilterChipGroup({
                 'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-caption transition-colors',
                 isActive
                   ? 'border-primary bg-primary/15 text-foreground'
-                  : 'border-input bg-background text-muted-foreground hover:border-[var(--mc-accent-soft)]/60 hover:text-foreground',
+                  : 'border-input bg-background text-muted-foreground hover:border-mc-accent-soft/60 hover:text-foreground',
               )}
             >
               <span className="uppercase tracking-wider">{display}</span>

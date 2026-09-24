@@ -283,7 +283,7 @@ importers:
         version: 5.0.0-beta.25(next@15.5.15(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
       next-pwa:
         specifier: ^5.6.0
-        version: 5.6.0(@babel/core@7.29.0)(next@15.5.15(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(webpack@5.106.2)
+        version: 5.6.0(@babel/core@7.29.0)(esbuild@0.28.0)(next@15.5.15(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(webpack@5.106.2(esbuild@0.28.0))
       react:
         specifier: ^19.0.0-rc
         version: 19.2.5
@@ -345,6 +345,9 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.6
+        version: 4.1.6(@types/node@22.19.17)(vite@8.0.12(@types/node@22.19.17)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.1)(tsx@4.21.0))
 
   apps/worker:
     dependencies:
@@ -7993,14 +7996,14 @@ snapshots:
 
   axobject-query@4.1.0: {}
 
-  babel-loader@8.4.1(@babel/core@7.29.0)(webpack@5.106.2):
+  babel-loader@8.4.1(@babel/core@7.29.0)(webpack@5.106.2(esbuild@0.28.0)):
     dependencies:
       '@babel/core': 7.29.0
       find-cache-dir: 3.3.2
       loader-utils: 2.0.4
       make-dir: 3.1.0
       schema-utils: 2.7.1
-      webpack: 5.106.2
+      webpack: 5.106.2(esbuild@0.28.0)
 
   babel-plugin-polyfill-corejs2@0.4.17(@babel/core@7.29.0):
     dependencies:
@@ -8163,10 +8166,10 @@ snapshots:
     dependencies:
       clsx: 2.1.1
 
-  clean-webpack-plugin@4.0.0(webpack@5.106.2):
+  clean-webpack-plugin@4.0.0(webpack@5.106.2(esbuild@0.28.0)):
     dependencies:
       del: 4.1.1
-      webpack: 5.106.2
+      webpack: 5.106.2(esbuild@0.28.0)
 
   client-only@0.0.1: {}
 
@@ -9587,14 +9590,14 @@ snapshots:
       next: 15.5.15(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
 
-  next-pwa@5.6.0(@babel/core@7.29.0)(next@15.5.15(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(webpack@5.106.2):
+  next-pwa@5.6.0(@babel/core@7.29.0)(esbuild@0.28.0)(next@15.5.15(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(webpack@5.106.2(esbuild@0.28.0)):
     dependencies:
-      babel-loader: 8.4.1(@babel/core@7.29.0)(webpack@5.106.2)
-      clean-webpack-plugin: 4.0.0(webpack@5.106.2)
+      babel-loader: 8.4.1(@babel/core@7.29.0)(webpack@5.106.2(esbuild@0.28.0))
+      clean-webpack-plugin: 4.0.0(webpack@5.106.2(esbuild@0.28.0))
       globby: 11.1.0
       next: 15.5.15(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      terser-webpack-plugin: 5.4.0(webpack@5.106.2)
-      workbox-webpack-plugin: 6.6.0(webpack@5.106.2)
+      terser-webpack-plugin: 5.4.0(esbuild@0.28.0)(webpack@5.106.2(esbuild@0.28.0))
+      workbox-webpack-plugin: 6.6.0(webpack@5.106.2(esbuild@0.28.0))
       workbox-window: 6.6.0
     transitivePeerDependencies:
       - '@babel/core'
@@ -10512,13 +10515,15 @@ snapshots:
       type-fest: 0.16.0
       unique-string: 2.0.0
 
-  terser-webpack-plugin@5.4.0(webpack@5.106.2):
+  terser-webpack-plugin@5.4.0(esbuild@0.28.0)(webpack@5.106.2(esbuild@0.28.0)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.46.1
-      webpack: 5.106.2
+      webpack: 5.106.2(esbuild@0.28.0)
+    optionalDependencies:
+      esbuild: 0.28.0
 
   terser@5.46.1:
     dependencies:
@@ -10787,7 +10792,7 @@ snapshots:
 
   webpack-sources@3.3.4: {}
 
-  webpack@5.106.2:
+  webpack@5.106.2(esbuild@0.28.0):
     dependencies:
       '@types/eslint-scope': 3.7.7
       '@types/estree': 1.0.8
@@ -10810,7 +10815,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.2
-      terser-webpack-plugin: 5.4.0(webpack@5.106.2)
+      terser-webpack-plugin: 5.4.0(esbuild@0.28.0)(webpack@5.106.2(esbuild@0.28.0))
       watchpack: 2.5.1
       webpack-sources: 3.3.4
     transitivePeerDependencies:
@@ -10984,12 +10989,12 @@ snapshots:
 
   workbox-sw@6.6.0: {}
 
-  workbox-webpack-plugin@6.6.0(webpack@5.106.2):
+  workbox-webpack-plugin@6.6.0(webpack@5.106.2(esbuild@0.28.0)):
     dependencies:
       fast-json-stable-stringify: 2.1.0
       pretty-bytes: 5.6.0
       upath: 1.2.0
-      webpack: 5.106.2
+      webpack: 5.106.2(esbuild@0.28.0)
       webpack-sources: 1.4.3
       workbox-build: 6.6.0
     transitivePeerDependencies:

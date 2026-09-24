@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   ClientOutboundMessageSchema,
+  verifyRealtimeToken,
   type PrinterState,
   type HmsError,
   type AmsSlot,
@@ -13,6 +14,8 @@ import { logger } from '../logger.js';
 import { hub } from './hub.js';
 import { db } from '../db.js';
 import { printerState } from '@printstudio/db';
+import { config } from '../config.js';
+import { filterOrgPrinterIds } from '../middleware/realtime-auth.js';
 
 async function loadSnapshot(printerIds: string[]): Promise<PrinterState[]> {
   if (printerIds.length === 0) return [];
@@ -60,13 +63,49 @@ async function loadSnapshot(printerIds: string[]): Promise<PrinterState[]> {
 }
 
 export async function registerClientRelay(app: FastifyInstance): Promise<void> {
-  app.get('/ws/client', { websocket: true }, async (socket) => {
-    // MVP: no WS auth (internal use, single-origin mismatch between Next :3000 and API :4000).
-    // TODO: pass short-lived token via query param when exposing to internet.
+  app.get('/ws/client', { websocket: true }, (socket, req) => {
+    // O token vem na query porque o browser não manda header no upgrade
+    // de WebSocket. Assinado pelo web (`/api/realtime-token`), escopa o
+    // socket a UMA organização: subscribe e command só valem pra
+    // impressoras dela.
+    const token = (req.query as { token?: unknown } | undefined)?.token;
+    const auth = verifyRealtimeToken(config.AUTH_SECRET, typeof token === 'string' ? token : null);
+
     hub.registerClient(socket);
-    logger.info('client connected');
+
+    function reply(msg: unknown) {
+      try {
+        socket.send(JSON.stringify(msg));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Listeners anexados de forma síncrona (senão o subscribe mandado no
+    // `open` do browser se perde) e processados em fila, pra um command
+    // logo depois do subscribe não ser avaliado antes dele.
+    let queue: Promise<void> = auth.then((payload) => {
+      if (!payload) {
+        logger.warn({ ip: req.ip }, 'client rejected: invalid realtime token');
+        socket.close(4401, 'unauthorized');
+        return;
+      }
+      logger.info({ org: payload.org }, 'client connected');
+    });
 
     socket.on('message', (raw: Buffer) => {
+      queue = queue
+        .then(async () => {
+          const payload = await auth;
+          if (!payload) return;
+          await handleMessage(raw, payload.org);
+        })
+        .catch((err: unknown) => {
+          logger.error({ err }, 'client message failed');
+        });
+    });
+
+    async function handleMessage(raw: Buffer, organizationId: string) {
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw.toString());
@@ -76,61 +115,42 @@ export async function registerClientRelay(app: FastifyInstance): Promise<void> {
 
       const result = ClientOutboundMessageSchema.safeParse(parsed);
       if (!result.success) {
-        try {
-          socket.send(
-            JSON.stringify({
-              type: 'error',
-              payload: { message: 'invalid message', code: 'BAD_MESSAGE' },
-            }),
-          );
-        } catch {
-          /* ignore */
-        }
+        reply({ type: 'error', payload: { message: 'invalid message', code: 'BAD_MESSAGE' } });
         return;
       }
       const msg = result.data;
 
       if (msg.type === 'subscribe') {
-        hub.subscribe(socket, msg.payload.printerIds);
+        const allowed = await filterOrgPrinterIds(organizationId, msg.payload.printerIds);
+        hub.subscribe(socket, allowed);
         // Send current snapshot immediately so the client doesn't wait for the next bridge push.
-        void loadSnapshot(msg.payload.printerIds).then((states) => {
-          for (const state of states) {
-            try {
-              socket.send(JSON.stringify({ type: 'printer.state', payload: state }));
-            } catch {
-              /* ignore */
-            }
-          }
-        });
+        const states = await loadSnapshot(allowed);
+        for (const state of states) reply({ type: 'printer.state', payload: state });
       } else if (msg.type === 'command') {
+        const [allowed] = await filterOrgPrinterIds(organizationId, [msg.payload.printerId]);
+        if (!allowed) {
+          logger.warn(
+            { org: organizationId, printerId: msg.payload.printerId },
+            'command rejected: printer outside org',
+          );
+          reply({ type: 'error', payload: { message: 'forbidden', code: 'FORBIDDEN' } });
+          return;
+        }
         const forwarded = hub.sendToBridge({
           type: 'command',
           payload: {
-            printerId: msg.payload.printerId,
+            printerId: allowed,
             action: msg.payload.action,
             commandId: randomUUID(),
           },
         });
         if (!forwarded) {
-          try {
-            socket.send(
-              JSON.stringify({
-                type: 'error',
-                payload: { message: 'bridge offline', code: 'BRIDGE_OFFLINE' },
-              }),
-            );
-          } catch {
-            /* ignore */
-          }
+          reply({ type: 'error', payload: { message: 'bridge offline', code: 'BRIDGE_OFFLINE' } });
         }
       } else if (msg.type === 'ping') {
-        try {
-          socket.send(JSON.stringify({ type: 'pong', payload: { ts: msg.payload.ts } }));
-        } catch {
-          /* ignore */
-        }
+        reply({ type: 'pong', payload: { ts: msg.payload.ts } });
       }
-    });
+    }
 
     socket.on('close', () => {
       hub.unregisterClient(socket);

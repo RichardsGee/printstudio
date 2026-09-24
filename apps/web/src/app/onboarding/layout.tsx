@@ -47,7 +47,7 @@ export default async function OnboardingLayout({
 
   return (
     <div className="min-h-dvh flex flex-col">
-      <header className="border-b border-[var(--mc-accent-soft)]/30">
+      <header className="border-b border-mc-accent-soft/30">
         <div className="container max-w-3xl flex h-14 items-center justify-between">
           <p
             data-mc-id

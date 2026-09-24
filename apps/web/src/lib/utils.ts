@@ -1,5 +1,19 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+// O tailwind-merge só conhece a escala padrão. Sem isto, `text-caption`
+// (tamanho, tailwind.config.ts) é lido como COR e o merge apaga a cor ou o
+// tamanho vizinho: cn('text-muted-foreground', 'text-caption') perdia a cor.
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      'font-size': [
+        { text: ['micro', 'caption', 'small', 'body', 'body-lg', 'heading', 'display'] },
+      ],
+      shadow: [{ shadow: ['elev-1', 'elev-2', 'elev-3'] }],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

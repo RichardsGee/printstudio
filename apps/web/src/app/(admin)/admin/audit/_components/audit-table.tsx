@@ -45,7 +45,7 @@ export function AuditTable({ rows }: AuditTableProps) {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-[var(--mc-accent-soft)]/30 bg-card/40 p-8 text-center">
+      <div className="rounded-lg border border-mc-accent-soft/30 bg-card/40 p-8 text-center">
         <p
           data-mc-id
           className="text-caption font-mono uppercase tracking-wider text-muted-foreground"
@@ -92,7 +92,7 @@ export function AuditTable({ rows }: AuditTableProps) {
                   <tr
                     onClick={() => setExpandedId(expanded ? null : row.id)}
                     className={cn(
-                      'cursor-pointer border-t border-[var(--mc-accent-soft)]/20 transition-colors hover:bg-card/30',
+                      'cursor-pointer border-t border-mc-accent-soft/20 transition-colors hover:bg-card/30',
                       expanded && 'bg-card/40',
                     )}
                   >

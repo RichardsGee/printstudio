@@ -48,7 +48,7 @@ export function AppHeader({ userEmail }: AppHeaderProps) {
   const [navOpen, setNavOpen] = useState(false);
 
   return (
-    <header className="border-b border-[var(--mc-accent-soft)]/40 bg-card/40 backdrop-blur h-14 flex items-center gap-3 sm:gap-6 px-4 sm:px-6 shrink-0">
+    <header className="border-b border-mc-accent-soft/40 bg-card/40 backdrop-blur h-14 flex items-center gap-3 sm:gap-6 px-4 sm:px-6 shrink-0">
       {/* Hamburger — só em mobile (<lg) */}
       <DialogPrimitive.Root open={navOpen} onOpenChange={setNavOpen}>
         <DialogPrimitive.Trigger asChild>
@@ -66,12 +66,12 @@ export function AppHeader({ userEmail }: AppHeaderProps) {
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
           />
           <DialogPrimitive.Content
-            className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-card border-r border-[var(--mc-accent-soft)]/40 shadow-elev-3 p-4 flex flex-col gap-3 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left duration-200"
+            className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-card border-r border-mc-accent-soft/40 shadow-elev-3 p-4 flex flex-col gap-3 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left duration-200"
           >
             <DialogPrimitive.Title className="sr-only">Menu de navegação</DialogPrimitive.Title>
 
             {/* Header do drawer: logo + close */}
-            <div className="flex items-center justify-between gap-2 pb-3 border-b border-[var(--mc-accent-soft)]/30">
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-mc-accent-soft/30">
               <div className="flex items-center gap-2">
                 <Printer className="h-5 w-5 text-primary" />
                 <span
@@ -100,7 +100,7 @@ export function AppHeader({ userEmail }: AppHeaderProps) {
                   href={item.href}
                   data-mc-label
                   onClick={() => setNavOpen(false)}
-                  className="flex items-center gap-3 border border-transparent hover:border-[var(--mc-accent-soft)]/50 px-3 h-11 text-small uppercase tracking-wider text-muted-foreground hover:bg-primary/10 hover:text-foreground transition-colors"
+                  className="flex items-center gap-3 border border-transparent hover:border-mc-accent-soft/50 px-3 h-11 text-small uppercase tracking-wider text-muted-foreground hover:bg-primary/10 hover:text-foreground transition-colors"
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   {item.label}
@@ -109,7 +109,7 @@ export function AppHeader({ userEmail }: AppHeaderProps) {
             </nav>
 
             {/* Footer drawer: email + sair */}
-            <div className="border-t border-[var(--mc-accent-soft)]/30 pt-3 space-y-2">
+            <div className="border-t border-mc-accent-soft/30 pt-3 space-y-2">
               {userEmail ? (
                 <div
                   data-mc-id
@@ -152,7 +152,7 @@ export function AppHeader({ userEmail }: AppHeaderProps) {
             key={item.href}
             href={item.href}
             data-mc-label
-            className="flex items-center gap-1.5 border border-transparent hover:border-[var(--mc-accent-soft)]/50 px-3 py-1 text-caption uppercase tracking-wider text-muted-foreground hover:bg-primary/10 hover:text-foreground transition-colors shrink-0"
+            className="flex items-center gap-1.5 border border-transparent hover:border-mc-accent-soft/50 px-3 py-1 text-caption uppercase tracking-wider text-muted-foreground hover:bg-primary/10 hover:text-foreground transition-colors shrink-0"
           >
             <item.icon className="h-3.5 w-3.5" />
             {item.label}
