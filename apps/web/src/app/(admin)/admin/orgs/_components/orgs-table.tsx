@@ -37,7 +37,7 @@ function formatDate(d: Date): string {
 export function OrgsTable({ rows }: OrgsTableProps) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-[var(--mc-accent-soft)]/30 bg-card/40 p-8 text-center">
+      <div className="rounded-lg border border-mc-accent-soft/30 bg-card/40 p-8 text-center">
         <p
           data-mc-id
           className="text-caption font-mono uppercase tracking-wider text-muted-foreground"
@@ -53,7 +53,7 @@ export function OrgsTable({ rows }: OrgsTableProps) {
 
   return (
     <>
-      <div className="hidden overflow-hidden rounded-lg border border-[var(--mc-accent-soft)]/30 lg:block">
+      <div className="hidden overflow-hidden rounded-lg border border-mc-accent-soft/30 lg:block">
         <table className="w-full text-small">
           <thead className="bg-card/40 text-caption uppercase tracking-wider text-muted-foreground">
             <tr>
@@ -69,7 +69,7 @@ export function OrgsTable({ rows }: OrgsTableProps) {
             {rows.map((row) => (
               <tr
                 key={row.id}
-                className="border-t border-[var(--mc-accent-soft)]/20 transition-colors hover:bg-card/30"
+                className="border-t border-mc-accent-soft/20 transition-colors hover:bg-card/30"
               >
                 <Td>
                   <Link
@@ -132,7 +132,7 @@ export function OrgsTable({ rows }: OrgsTableProps) {
             key={row.id}
             href={`/admin/orgs/${row.id}`}
             data-mc-card
-            className="block space-y-2 rounded-lg border border-[var(--mc-accent-soft)]/30 bg-card/40 p-4 transition-colors hover:border-primary/40"
+            className="block space-y-2 rounded-lg border border-mc-accent-soft/30 bg-card/40 p-4 transition-colors hover:border-primary/40"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="space-y-0.5 min-w-0">

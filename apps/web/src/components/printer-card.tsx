@@ -138,7 +138,7 @@ export function PrinterCard({ printerId, name, state }: Props) {
           />
         </div>
 
-        <div className="flex items-center justify-between border-t border-[var(--mc-accent-soft)]/30 pt-3">
+        <div className="flex items-center justify-between border-t border-mc-accent-soft/30 pt-3">
           <SpeedModeIndicator mode={state?.speedMode ?? null} percent={state?.speedPercent} />
           <WifiIndicator dbm={state?.wifiSignalDbm ?? null} showDbm={false} />
         </div>

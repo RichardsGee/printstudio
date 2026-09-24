@@ -36,7 +36,7 @@ export function WizardProgress({ current }: WizardProgressProps) {
               key={step.id}
               className={cn(
                 'flex flex-1 items-center gap-2',
-                i < STEPS.length - 1 && 'after:hidden sm:after:block sm:after:h-px sm:after:flex-1 sm:after:bg-[var(--mc-accent-soft)]/30',
+                i < STEPS.length - 1 && 'after:hidden sm:after:block sm:after:h-px sm:after:flex-1 sm:after:bg-mc-accent-soft/30',
               )}
               aria-current={active ? 'step' : undefined}
             >

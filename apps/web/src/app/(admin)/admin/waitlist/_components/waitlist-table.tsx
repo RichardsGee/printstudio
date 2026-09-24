@@ -62,7 +62,7 @@ export function WaitlistTable({ rows }: WaitlistTableProps) {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-[var(--mc-accent-soft)]/30 bg-card/40 p-8 text-center">
+      <div className="rounded-lg border border-mc-accent-soft/30 bg-card/40 p-8 text-center">
         <p
           data-mc-id
           className="text-caption font-mono uppercase tracking-wider text-muted-foreground"
@@ -78,7 +78,7 @@ export function WaitlistTable({ rows }: WaitlistTableProps) {
 
   return (
     <>
-      <div className="hidden overflow-hidden rounded-lg border border-[var(--mc-accent-soft)]/30 lg:block">
+      <div className="hidden overflow-hidden rounded-lg border border-mc-accent-soft/30 lg:block">
         <table className="w-full text-small">
           <thead className="bg-card/40 text-caption uppercase tracking-wider text-muted-foreground">
             <tr>
@@ -180,7 +180,7 @@ function WaitlistRowDesktop({ row, onOpenDetail }: RowProps) {
   }
 
   return (
-    <tr className="border-t border-[var(--mc-accent-soft)]/20 hover:bg-card/30">
+    <tr className="border-t border-mc-accent-soft/20 hover:bg-card/30">
       <td className="px-3 py-2.5">
         <div className="space-y-0.5">
           <div className="font-medium">{row.name}</div>
@@ -282,7 +282,7 @@ function WaitlistRowMobile({ row, onOpenDetail }: RowProps) {
   return (
     <div
       data-mc-card
-      className="space-y-3 rounded-lg border border-[var(--mc-accent-soft)]/30 bg-card/40 p-4"
+      className="space-y-3 rounded-lg border border-mc-accent-soft/30 bg-card/40 p-4"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-0.5 min-w-0">

@@ -119,7 +119,7 @@ export function KioskClient({ printers }: Props) {
   if (printers.length === 0) {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6">
-        <div className="border border-dashed border-[var(--mc-accent-soft)]/40 p-12 text-center text-muted-foreground">
+        <div className="border border-dashed border-mc-accent-soft/40 p-12 text-center text-muted-foreground">
           <div className="text-heading uppercase tracking-wider">
             Nenhuma impressora cadastrada
           </div>
@@ -246,7 +246,7 @@ function SortablePrinterCard({ printerId, name, state, editMode }: SortableCardP
           className="absolute inset-0 z-20 cursor-grab active:cursor-grabbing bg-primary/5 border-2 border-dashed border-primary/40 flex items-center justify-center"
           aria-label={`Arrastar ${name}`}
         >
-          <div className="bg-card border border-[var(--mc-accent-soft)] px-4 py-2 flex items-center gap-2 text-primary">
+          <div className="bg-card border border-mc-accent-soft px-4 py-2 flex items-center gap-2 text-primary">
             <GripVertical className="h-5 w-5" />
             <span data-mc-label className="text-caption uppercase tracking-wider">
               Arrastar

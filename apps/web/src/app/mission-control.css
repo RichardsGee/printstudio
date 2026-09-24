@@ -15,14 +15,32 @@
 */
 
 .kiosk-mission {
-  --mc-accent: #22d3ee;          /* cyan brilhante = primário */
-  --mc-accent-soft: #0891b2;     /* cyan escuro */
-  --mc-warning: #fbbf24;         /* amber */
-  --mc-danger: #ef4444;
-  --mc-success: #34d399;
-  --mc-bg: #050810;
-  --mc-fg: #d1d5db;
-  --mc-fg-dim: #6b7280;
+  /* Canais RGB = fonte única. O Tailwind lê os `-rgb` (`bg-mc-accent/30`
+     etc., ver tailwind.config.ts) e o CSS/inline usa as versões prontas
+     abaixo. Opacidade sobre `var(--mc-x)` crua NÃO funciona no Tailwind. */
+  --mc-accent-rgb: 34 211 238;       /* #22d3ee cyan brilhante = primário */
+  --mc-accent-soft-rgb: 8 145 178;   /* #0891b2 cyan escuro */
+  --mc-warning-rgb: 251 191 36;      /* #fbbf24 amber */
+  --mc-danger-rgb: 239 68 68;        /* #ef4444 */
+  --mc-success-rgb: 52 211 153;      /* #34d399 */
+  --mc-bg-rgb: 5 8 16;               /* #050810 */
+  --mc-fg-rgb: 209 213 219;          /* #d1d5db */
+  --mc-fg-dim-rgb: 107 114 128;      /* #6b7280 */
+
+  --mc-accent: rgb(var(--mc-accent-rgb));
+  --mc-accent-soft: rgb(var(--mc-accent-soft-rgb));
+  --mc-warning: rgb(var(--mc-warning-rgb));
+  --mc-danger: rgb(var(--mc-danger-rgb));
+  --mc-success: rgb(var(--mc-success-rgb));
+  --mc-bg: rgb(var(--mc-bg-rgb));
+  --mc-fg: rgb(var(--mc-fg-rgb));
+  --mc-fg-dim: rgb(var(--mc-fg-dim-rgb));
+
+  /* Primary do shadcn = cyan do MC. Redefinir a variável (em vez de
+     sobrescrever classe por classe) cobre toda variante: bg-primary/90,
+     ring-primary, hover:, gradientes e o foco (--ring). HSL de #22d3ee. */
+  --primary: 188 86% 53%;
+  --ring: 188 86% 53%;
   --mc-grid-line: rgba(34, 211, 238, 0.05);
   --mc-grid-line-strong: rgba(34, 211, 238, 0.12);
 
@@ -183,13 +201,6 @@
   border-color: transparent var(--mc-accent) transparent transparent;
   opacity: 0.6;
 }
-
-/* Override do primary global pra cyan dentro do kiosk */
-.kiosk-mission .text-primary { color: var(--mc-accent) !important; }
-.kiosk-mission .bg-primary { background-color: var(--mc-accent) !important; }
-.kiosk-mission .border-primary { border-color: var(--mc-accent) !important; }
-.kiosk-mission .from-primary\/80 { --tw-gradient-from: rgba(34, 211, 238, 0.8) !important; }
-.kiosk-mission .to-primary { --tw-gradient-to: var(--mc-accent) !important; }
 
 /* Progress bar como gauge segmentado — substitui visual do
    bg-gradient. 20 segmentos, lit conforme progresso. */

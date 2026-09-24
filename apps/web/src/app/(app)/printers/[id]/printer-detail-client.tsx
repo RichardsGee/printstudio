@@ -176,7 +176,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             {shouldShowStage(state?.status, state?.stage) ? (
               <span
                 data-mc-label
-                className="inline-flex items-center gap-1 text-caption uppercase tracking-wider border border-[var(--mc-accent-soft)]/40 bg-muted/40 text-muted-foreground px-1.5 py-0.5"
+                className="inline-flex items-center gap-1 text-caption uppercase tracking-wider border border-mc-accent-soft/40 bg-muted/40 text-muted-foreground px-1.5 py-0.5"
               >
                 {state!.stage}
               </span>
@@ -325,7 +325,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               </div>
 
               {/* 4 pills uniformes (mesmo height/width via grid-cols-4) */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-3 border-t border-[var(--mc-accent-soft)]/30">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-3 border-t border-mc-accent-soft/30">
                 <InfoPill label="ETA" value={formatEtaClock(state?.remainingSec)} />
                 <InfoPill label="RESTANTE" value={formatDuration(state?.remainingSec)} />
                 <InfoPill
@@ -334,7 +334,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
                     state?.speedPercent != null ? `${Math.round(state.speedPercent)}%` : '—'
                   }
                 />
-                <div className="border border-[var(--mc-accent-soft)]/30 bg-gradient-to-b from-muted/30 to-muted/10 px-2.5 py-1.5 flex flex-col gap-0.5">
+                <div className="border border-mc-accent-soft/30 bg-gradient-to-b from-muted/30 to-muted/10 px-2.5 py-1.5 flex flex-col gap-0.5">
                   <FilamentTotal
                     printerId={printerId}
                     refreshKey={state?.status === 'FINISH' ? state.updatedAt : null}
@@ -403,7 +403,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               />
             </div>
 
-            <div className="space-y-1 pt-3 border-t border-[var(--mc-accent-soft)]/30">
+            <div className="space-y-1 pt-3 border-t border-mc-accent-soft/30">
               <div
                 data-mc-label
                 className="text-caption uppercase tracking-wider text-muted-foreground"
@@ -421,7 +421,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             {state?.nozzleDiameter || state?.nozzleType ? (
               <div
                 data-mc-label
-                className="text-caption text-muted-foreground pt-3 border-t border-[var(--mc-accent-soft)]/30 uppercase tracking-wider"
+                className="text-caption text-muted-foreground pt-3 border-t border-mc-accent-soft/30 uppercase tracking-wider"
               >
                 Bico{' '}
                 {state?.nozzleDiameter ? `${state.nozzleDiameter}mm` : ''}{' '}
@@ -439,7 +439,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 pb-3 flex-1 flex flex-col">
-            <div className="relative aspect-[3/2] bg-gradient-to-br from-muted/30 to-background border border-[var(--mc-accent-soft)]/30 overflow-hidden flex items-center justify-center">
+            <div className="relative aspect-[3/2] bg-gradient-to-br from-muted/30 to-background border border-mc-accent-soft/30 overflow-hidden flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/bambu-a1.png"
@@ -462,7 +462,7 @@ export function PrinterDetailClient({ printerId, name }: Props) {
               bare
             />
 
-            <div className="flex items-center gap-2 pt-3 border-t border-[var(--mc-accent-soft)]/30 mt-auto">
+            <div className="flex items-center gap-2 pt-3 border-t border-mc-accent-soft/30 mt-auto">
               <span
                 data-mc-label
                 className="text-caption uppercase tracking-wider text-muted-foreground shrink-0"
@@ -626,7 +626,7 @@ function shouldShowStage(status: string | undefined, stage: string | null | unde
 
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-[var(--mc-accent-soft)]/30 bg-gradient-to-b from-muted/30 to-muted/10 px-2.5 py-1.5 flex flex-col gap-0.5">
+    <div className="border border-mc-accent-soft/30 bg-gradient-to-b from-muted/30 to-muted/10 px-2.5 py-1.5 flex flex-col gap-0.5">
       <span
         data-mc-label
         className="text-caption uppercase tracking-wider text-muted-foreground"

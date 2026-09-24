@@ -48,7 +48,7 @@ export function KioskStatusBanner({ printers, states }: Props) {
     >
       <div
         data-mc-id
-        className="absolute -top-2 left-3 px-2 text-[10px] uppercase tracking-widest text-[var(--mc-accent)] bg-[var(--mc-bg)]"
+        className="absolute -top-2 left-3 px-2 text-[10px] uppercase tracking-widest text-mc-accent bg-mc-bg"
       >
         ◢ MISSION CONTROL · STATION TEL-RJ-01
       </div>

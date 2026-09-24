@@ -46,7 +46,7 @@ export default function EsqueciSenhaPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-3 rounded-md border border-[var(--mc-accent-soft)]/30 bg-card/40 p-4">
+          <div className="space-y-3 rounded-md border border-mc-accent-soft/30 bg-card/40 p-4">
             <p className="text-small">
               Entre em contato com nosso suporte que recuperamos sua senha
               em até 24h.

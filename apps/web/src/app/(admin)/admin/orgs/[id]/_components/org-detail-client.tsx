@@ -93,7 +93,7 @@ export function OrgDetailClient({ detail }: { detail: OrgFullDetail }) {
         </p>
       </header>
 
-      <div className="border-b border-[var(--mc-accent-soft)]/30">
+      <div className="border-b border-mc-accent-soft/30">
         <nav className="flex gap-1 overflow-x-auto" aria-label="Abas">
           {TABS.map((t) => (
             <button
@@ -231,7 +231,7 @@ function MembersTab({ members }: { members: OrgFullDetail['members'] }) {
             {members.map((m) => (
               <tr
                 key={m.userId}
-                className="border-t border-[var(--mc-accent-soft)]/20"
+                className="border-t border-mc-accent-soft/20"
               >
                 <Td>
                   <div className="flex items-center gap-2">
@@ -293,7 +293,7 @@ function PrintersTab({ printers }: { printers: OrgFullDetail['printers'] }) {
           </thead>
           <tbody>
             {printers.map((p) => (
-              <tr key={p.id} className="border-t border-[var(--mc-accent-soft)]/20">
+              <tr key={p.id} className="border-t border-mc-accent-soft/20">
                 <Td>
                   <span data-mc-num className="font-mono">
                     {p.displayOrder ?? '—'}
@@ -332,7 +332,7 @@ function EventsTab({ events }: { events: OrgFullDetail['recentEvents'] }) {
         {events.map((e) => (
           <div
             key={e.id}
-            className="flex items-start gap-3 border-b border-[var(--mc-accent-soft)]/10 pb-2 last:border-0 last:pb-0"
+            className="flex items-start gap-3 border-b border-mc-accent-soft/10 pb-2 last:border-0 last:pb-0"
           >
             <Badge
               variant="outline"
@@ -396,7 +396,7 @@ function Td({ children }: { children: React.ReactNode }) {
 
 function EmptyCard({ label, text }: { label: string; text: string }) {
   return (
-    <div className="rounded-lg border border-[var(--mc-accent-soft)]/30 bg-card/40 p-8 text-center">
+    <div className="rounded-lg border border-mc-accent-soft/30 bg-card/40 p-8 text-center">
       <p
         data-mc-id
         className="text-caption font-mono uppercase tracking-wider text-muted-foreground"

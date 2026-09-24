@@ -35,7 +35,7 @@ export function PrintersAdminClient({ printers }: Props) {
             Nenhuma impressora cadastrada.
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--mc-accent-soft)]/30">
+          <ul className="divide-y divide-mc-accent-soft/30">
             {printers.map((p) => (
               <PrinterRowItem key={p.id} printer={p} />
             ))}
